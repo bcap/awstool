@@ -1,16 +1,18 @@
 package main
 
 import (
-	"aws-tools/aws/ec2"
-	"aws-tools/aws/elb"
-	"aws-tools/aws/opsworks"
-	"aws-tools/executor"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 	"sync"
+
+	"aws-tools/aws/ec2"
+	"aws-tools/aws/elb"
+	"aws-tools/aws/opsworks"
+	"aws-tools/aws/s3"
+	"aws-tools/executor"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 )
@@ -31,6 +33,7 @@ func run(ctx context.Context, cfg aws.Config) error {
 
 	fetchEC2(ctx, cfg, executor, errorsCh, &result)
 	fetchELBs(ctx, cfg, executor, errorsCh, &result)
+	fetchS3(ctx, cfg, executor, errorsCh, &result)
 	fetchOpsworks(ctx, cfg, executor, errorsCh, &result)
 
 	errors := make([]error, 0)
@@ -82,6 +85,16 @@ func fetchEC2(ctx context.Context, cfg aws.Config, executor *executor.Executor, 
 			errorsCh <- fmt.Errorf("error while fetching all EBS volumes: %w", err)
 		}
 		result.EC2.Volumes = volumes
+	})
+}
+
+func fetchS3(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *Result) {
+	executor.Launch(ctx, func() {
+		buckets, err := s3.FetchAllBuckets(ctx, cfg)
+		if err != nil {
+			errorsCh <- fmt.Errorf("error while fetching all EC2 instances: %w", err)
+		}
+		result.S3.Buckets = buckets
 	})
 }
 

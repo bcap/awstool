@@ -5,11 +5,13 @@ import (
 	elbTypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing/types"
 	elbv2Types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	opswTypes "github.com/aws/aws-sdk-go-v2/service/opsworks/types"
+	s3Types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type Result struct {
 	EC2      EC2
 	ELB      ELB
+	S3       S3
 	Opsworks Opsworks
 }
 
@@ -29,6 +31,10 @@ type ELBv1 struct {
 
 type ELBv2 struct {
 	LoadBalancers []elbv2Types.LoadBalancer
+}
+
+type S3 struct {
+	Buckets []s3Types.Bucket
 }
 
 type Opsworks struct {
