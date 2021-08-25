@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"aws-tools/ec2"
-	"aws-tools/elb"
+	"aws-tools/aws/ec2"
+	"aws-tools/aws/elb"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
