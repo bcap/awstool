@@ -15,10 +15,13 @@ func FetchAll(what string, fetchBatchFn FetchBatchFn, options ...LoaderOptionFn)
 	for batchNum := 1; ; batchNum++ {
 		var err error
 		var newNextToken *string
-		for try := 0; try <= opts.maxRetries; try++ {
+		for try := 0; ; try++ {
 			newNextToken, err = fetchBatchFn(nextToken)
 			if err == nil {
 				nextToken = newNextToken
+				break
+			}
+			if try == opts.maxRetries || !isRetryable(err) {
 				break
 			}
 			sleepTime := backoffTime(try, opts)
@@ -30,7 +33,7 @@ func FetchAll(what string, fetchBatchFn FetchBatchFn, options ...LoaderOptionFn)
 		}
 		if err != nil {
 			return fmt.Errorf(
-				"while fetching %s in batch %d after %d tries: %w",
+				"fetching %s in batch %d after %d tries: %w",
 				what, batchNum, opts.maxRetries+1, err,
 			)
 		}
@@ -44,4 +47,9 @@ func FetchAll(what string, fetchBatchFn FetchBatchFn, options ...LoaderOptionFn)
 func backoffTime(try int, opts loaderOptions) time.Duration {
 	factor := math.Pow(float64(opts.backoffFactor), float64(try))
 	return time.Duration(float64(opts.sleepBetweenRetries) * factor)
+}
+
+func isRetryable(err error) bool {
+	// TODO differentiate between retryable vs non-retryable errors
+	return true
 }
