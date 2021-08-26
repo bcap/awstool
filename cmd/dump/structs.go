@@ -8,7 +8,12 @@ import (
 	s3Types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-type Result struct {
+type AWS struct {
+	Regions map[string]AWSRegion
+}
+
+type AWSRegion struct {
+	Region   string
 	EC2      EC2
 	ELB      ELB
 	S3       S3
@@ -34,7 +39,8 @@ type ELBv2 struct {
 }
 
 type S3 struct {
-	Buckets []s3Types.Bucket
+	Buckets    []s3Types.Bucket
+	BucketTags map[string][]s3Types.Tag
 }
 
 type Opsworks struct {
@@ -42,4 +48,20 @@ type Opsworks struct {
 	Layers    []opswTypes.Layer
 	Apps      []opswTypes.App
 	Instances []opswTypes.Instance
+}
+
+func NewAWS() AWS {
+	return AWS{
+		Regions: make(map[string]AWSRegion),
+	}
+}
+
+func NewAWSRegion(region string) AWSRegion {
+	return AWSRegion{
+		Region: region,
+		S3: S3{
+			Buckets:    []s3Types.Bucket{},
+			BucketTags: map[string][]s3Types.Tag{},
+		},
+	}
 }

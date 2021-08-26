@@ -2,34 +2,59 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 	"sync"
 
-	"aws-tools/aws/ec2"
-	"aws-tools/aws/elb"
-	"aws-tools/aws/opsworks"
-	"aws-tools/aws/s3"
+	"aws-tools/common"
 	"aws-tools/executor"
+	"aws-tools/loader"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
-func run(ctx context.Context, cfg aws.Config) error {
-	maxParallelism := 10
+func DumpAWS(ctx context.Context, cfg aws.Config) (AWS, error) {
+	result := NewAWS()
+	errors := []error{}
+	var resultLock sync.Mutex
 
-	result := Result{
-		EC2: EC2{},
-		ELB: ELB{
-			V1: ELBv1{},
-			V2: ELBv2{},
-		},
-		Opsworks: Opsworks{},
+	regions, err := loader.FetchAllRegions(ctx, cfg)
+	if err != nil {
+		return result, err
 	}
+
+	executor := executor.NewExecutor(0)
+	for _, region := range regions {
+		regionName := *region.RegionName
+		executor.Launch(ctx, func() {
+			cfgCopy := cfg
+			cfgCopy.Region = regionName
+			regionDump, err := DumpAWSRegion(ctx, cfgCopy)
+			resultLock.Lock()
+			if err != nil {
+				errors = append(errors, err)
+			}
+			result.Regions[regionName] = regionDump
+			resultLock.Unlock()
+		})
+	}
+
+	err = executor.Wait(ctx)
+	if err != nil {
+		return result, err
+	}
+	if len(errors) > 0 {
+		return result, common.NewErrors(errors)
+	}
+
+	return result, err
+}
+
+func DumpAWSRegion(ctx context.Context, cfg aws.Config) (AWSRegion, error) {
+	result := NewAWSRegion(cfg.Region)
 	errorsCh := make(chan error)
-	executor := executor.NewExecutor(maxParallelism)
+	executor := executor.NewExecutor(0)
 
 	fetchEC2(ctx, cfg, executor, errorsCh, &result)
 	fetchELBs(ctx, cfg, executor, errorsCh, &result)
@@ -54,25 +79,15 @@ func run(ctx context.Context, cfg aws.Config) error {
 			log.Printf(" - %v", err)
 			errStrings[i] = err.Error()
 		}
-		return fmt.Errorf("multiple errors [%s]", strings.Join(errStrings, ", "))
+		return result, fmt.Errorf("multiple errors [%s]", strings.Join(errStrings, ", "))
 	}
 
-	log.Print("Data fully loaded, encoding to json")
-
-	jsonBytes, err := json.Marshal(result)
-	if err != nil {
-		log.Fatalf("Error while encoding result to json: %v", err)
-		return err
-	}
-
-	fmt.Println(string(jsonBytes))
-
-	return nil
+	return result, nil
 }
 
-func fetchEC2(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *Result) {
+func fetchEC2(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *AWSRegion) {
 	executor.Launch(ctx, func() {
-		reservations, err := ec2.FetchAllInstances(ctx, cfg)
+		reservations, err := loader.FetchAllInstances(ctx, cfg)
 		if err != nil {
 			errorsCh <- fmt.Errorf("error while fetching all EC2 instances: %w", err)
 		}
@@ -80,7 +95,7 @@ func fetchEC2(ctx context.Context, cfg aws.Config, executor *executor.Executor, 
 	})
 
 	executor.Launch(ctx, func() {
-		volumes, err := ec2.FetchAllEBSVolumes(ctx, cfg)
+		volumes, err := loader.FetchAllEBSVolumes(ctx, cfg)
 		if err != nil {
 			errorsCh <- fmt.Errorf("error while fetching all EBS volumes: %w", err)
 		}
@@ -88,19 +103,37 @@ func fetchEC2(ctx context.Context, cfg aws.Config, executor *executor.Executor, 
 	})
 }
 
-func fetchS3(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *Result) {
+func fetchS3(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *AWSRegion) {
 	executor.Launch(ctx, func() {
-		buckets, err := s3.FetchAllBuckets(ctx, cfg)
+		buckets, err := loader.FetchAllBuckets(ctx, cfg)
 		if err != nil {
 			errorsCh <- fmt.Errorf("error while fetching all EC2 instances: %w", err)
 		}
 		result.S3.Buckets = buckets
 	})
+
+	// executor.Launch(ctx, func() {
+	// 	<-bucketsDoneCh
+	// 	var lock sync.Mutex
+	// 	for _, bucket := range result.S3.Buckets {
+	// 		bucketName := *bucket.Name
+	// 		executor.Launch(ctx, func() {
+	// 			tags, err := loader.FetchBucketTags(ctx, cfg, bucketName)
+	// 			if err != nil {
+	// 				errorsCh <- fmt.Errorf("error while fetching tags for S3 bucket %s: %w", bucketName, err)
+	// 			}
+	// 			lock.Lock()
+	// 			defer lock.Unlock()
+	// 			result.S3.BucketTags[bucketName] = tags
+	// 		})
+	// 	}
+	// })
+
 }
 
-func fetchELBs(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *Result) {
+func fetchELBs(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *AWSRegion) {
 	executor.Launch(ctx, func() {
-		elbs, err := elb.FetchAllV1ELBs(ctx, cfg)
+		elbs, err := loader.FetchAllV1ELBs(ctx, cfg)
 		if err != nil {
 			errorsCh <- fmt.Errorf("error while fetching all ELBs (v1): %w", err)
 		}
@@ -108,7 +141,7 @@ func fetchELBs(ctx context.Context, cfg aws.Config, executor *executor.Executor,
 	})
 
 	executor.Launch(ctx, func() {
-		elbs, err := elb.FetchAllV2ELBs(ctx, cfg)
+		elbs, err := loader.FetchAllV2ELBs(ctx, cfg)
 		if err != nil {
 			errorsCh <- fmt.Errorf("error while fetching all ELBs (v2): %w", err)
 		}
@@ -116,50 +149,52 @@ func fetchELBs(ctx context.Context, cfg aws.Config, executor *executor.Executor,
 	})
 }
 
-func fetchOpsworks(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *Result) {
+func fetchOpsworks(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *AWSRegion) {
 	stacksDoneCh := executor.Launch(ctx, func() {
-		stacks, err := opsworks.FetchAllOpsworksStacks(ctx, cfg)
+		stacks, err := loader.FetchAllOpsworksStacks(ctx, cfg)
 		if err != nil {
 			errorsCh <- fmt.Errorf("error while fetching all Opsworks stacks: %w", err)
 		}
 		result.Opsworks.Stacks = stacks
 	})
 
-	<-stacksDoneCh
-	var layersLock sync.Mutex
-	var appsLock sync.Mutex
-	var instancesLock sync.Mutex
-	for _, stack := range result.Opsworks.Stacks {
-		stackId := *stack.StackId
+	executor.Launch(ctx, func() {
+		<-stacksDoneCh
+		var layersLock sync.Mutex
+		var appsLock sync.Mutex
+		var instancesLock sync.Mutex
+		for _, stack := range result.Opsworks.Stacks {
+			stackId := *stack.StackId
 
-		executor.Launch(ctx, func() {
-			layers, err := opsworks.FetchAllOpsworksLayers(ctx, cfg, stackId)
-			if err != nil {
-				errorsCh <- fmt.Errorf("error while fetching all Opsworks layers for stack %s: %w", stackId, err)
-			}
-			layersLock.Lock()
-			defer layersLock.Unlock()
-			result.Opsworks.Layers = append(result.Opsworks.Layers, layers...)
-		})
+			executor.Launch(ctx, func() {
+				layers, err := loader.FetchAllOpsworksLayers(ctx, cfg, stackId)
+				if err != nil {
+					errorsCh <- fmt.Errorf("error while fetching all Opsworks layers for stack %s: %w", stackId, err)
+				}
+				layersLock.Lock()
+				defer layersLock.Unlock()
+				result.Opsworks.Layers = append(result.Opsworks.Layers, layers...)
+			})
 
-		executor.Launch(ctx, func() {
-			apps, err := opsworks.FetchAllOpsworksApps(ctx, cfg, stackId)
-			if err != nil {
-				errorsCh <- fmt.Errorf("error while fetching all Opsworks apps for stack %s: %w", stackId, err)
-			}
-			appsLock.Lock()
-			defer appsLock.Unlock()
-			result.Opsworks.Apps = append(result.Opsworks.Apps, apps...)
-		})
+			executor.Launch(ctx, func() {
+				apps, err := loader.FetchAllOpsworksApps(ctx, cfg, stackId)
+				if err != nil {
+					errorsCh <- fmt.Errorf("error while fetching all Opsworks apps for stack %s: %w", stackId, err)
+				}
+				appsLock.Lock()
+				defer appsLock.Unlock()
+				result.Opsworks.Apps = append(result.Opsworks.Apps, apps...)
+			})
 
-		executor.Launch(ctx, func() {
-			instances, err := opsworks.FetchAllOpsworksInstances(ctx, cfg, stackId)
-			if err != nil {
-				errorsCh <- fmt.Errorf("error while fetching all Opsworks instances for stack %s: %w", stackId, err)
-			}
-			instancesLock.Lock()
-			defer instancesLock.Unlock()
-			result.Opsworks.Instances = append(result.Opsworks.Instances, instances...)
-		})
-	}
+			executor.Launch(ctx, func() {
+				instances, err := loader.FetchAllOpsworksInstances(ctx, cfg, stackId)
+				if err != nil {
+					errorsCh <- fmt.Errorf("error while fetching all Opsworks instances for stack %s: %w", stackId, err)
+				}
+				instancesLock.Lock()
+				defer instancesLock.Unlock()
+				result.Opsworks.Instances = append(result.Opsworks.Instances, instances...)
+			})
+		}
+	})
 }

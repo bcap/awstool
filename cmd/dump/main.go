@@ -2,10 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
 )
 
@@ -13,25 +17,44 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg, err := loadConfig(ctx)
+	cfg, err := configure(ctx)
 	if err != nil {
 		log.Fatalf("Failed to load config, cannot continue: %v", err)
 		os.Exit(1)
 	}
 
-	if err := run(ctx, cfg); err != nil {
+	result, err := DumpAWS(ctx, cfg)
+	if err != nil {
+		log.Printf("Execution failed: %v", err)
 		os.Exit(1)
 	}
+
+	log.Print("Data fully loaded, encoding to json")
+
+	jsonBytes, err := json.Marshal(result)
+	if err != nil {
+		log.Fatalf("Error while encoding result to json: %v", err)
+		os.Exit(1)
+	}
+
+	fmt.Println(string(jsonBytes))
 
 	log.Println("Done")
 }
 
-func loadConfig(ctx context.Context) (aws.Config, error) {
-	log.Println("Loading default config")
+func configure(ctx context.Context) (aws.Config, error) {
+	createRetryer := func() aws.Retryer {
+		return retry.NewStandard(
+			func(opts *retry.StandardOptions) {
+				opts.MaxAttempts = 5
+				opts.MaxBackoff = 10 * time.Second
+			},
+		)
+	}
 
-	opts := []func(*config.LoadOptions) error{}
-	//TODO gate this behind a flag
-	opts = append(opts, config.WithSharedConfigProfile("vtex"))
-
-	return config.LoadDefaultConfig(ctx, opts...)
+	return config.LoadDefaultConfig(
+		ctx,
+		config.WithSharedConfigProfile("vtex"),
+		config.WithRetryer(createRetryer),
+	)
 }

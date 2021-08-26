@@ -1,10 +1,8 @@
-package ec2
+package loader
 
 import (
 	"context"
 	"log"
-
-	"aws-tools/loader"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -14,12 +12,10 @@ import (
 func FetchAllInstances(
 	ctx context.Context,
 	cfg aws.Config,
-	loaderOpts ...loader.LoaderOptionFn,
 ) ([]ec2Types.Reservation, error) {
-	log.Print("Fetching all EC2 instances")
+	log.Printf("Fetching all %s EC2 instances", cfg.Region)
 
 	reservations := []ec2Types.Reservation{}
-	batches := 0
 	numInstances := 0
 	numGroups := 0
 
@@ -37,18 +33,17 @@ func FetchAllInstances(
 			numGroups += len(reservation.Groups)
 		}
 		reservations = append(reservations, describeResult.Reservations...)
-		batches++
 		return describeResult.NextToken, nil
 	}
 
-	err := loader.FetchAll("instances", load, loaderOpts...)
+	err := FetchAll("instances", load)
 	if err != nil {
 		return reservations, err
 	}
 
 	log.Printf(
-		"Fetched %d reservations with a total of %d groups and %d instances in %d batches",
-		len(reservations), numGroups, numInstances, batches,
+		"Fetched %d %s reservations with a total of %d groups and %d instances",
+		len(reservations), cfg.Region, numGroups, numInstances,
 	)
 	return reservations, nil
 }
@@ -56,12 +51,10 @@ func FetchAllInstances(
 func FetchAllEBSVolumes(
 	ctx context.Context,
 	cfg aws.Config,
-	loaderOpts ...loader.LoaderOptionFn,
 ) ([]ec2Types.Volume, error) {
-	log.Print("Fetching all EC2 EBS volumes")
+	log.Printf("Fetching all %s EBS volumes", cfg.Region)
 
 	volumes := []ec2Types.Volume{}
-	batches := 0
 
 	client := ec2.NewFromConfig(cfg)
 
@@ -73,16 +66,15 @@ func FetchAllEBSVolumes(
 			return nil, err
 		}
 		volumes = append(volumes, describeResult.Volumes...)
-		batches++
 		return describeResult.NextToken, nil
 	}
 
-	err := loader.FetchAll("ebs volumes", load, loaderOpts...)
+	err := FetchAll("ebs volumes", load)
 	if err != nil {
 		return volumes, err
 	}
 
-	log.Printf("Fetched %d volumes in %d batches", len(volumes), batches)
+	log.Printf("Fetched %d %s volumes", len(volumes), cfg.Region)
 
 	return volumes, nil
 }
