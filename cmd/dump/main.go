@@ -68,9 +68,8 @@ func createCommand() *cobra.Command {
 	var excludeServices []string
 
 	cmd := cobra.Command{
-		Use: "dump",
-		Short: "Dumps the current AWS inventory. " +
-			"The result is a single json describing all of the asserts used in AWS.",
+		Use:           "dump",
+		Short:         "Generates a single json dumping the results of many different description APIs from AWS",
 		SilenceErrors: true,
 	}
 
