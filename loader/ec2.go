@@ -2,18 +2,18 @@ package loader
 
 import (
 	"context"
-	"log"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2Types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	log "github.com/sirupsen/logrus"
 )
 
 func FetchAllInstances(
 	ctx context.Context,
 	cfg aws.Config,
 ) ([]ec2Types.Reservation, error) {
-	log.Printf("Fetching all %s EC2 instances", cfg.Region)
+	log.Debugf("Fetching all EC2 reservations and instances in %s", cfg.Region)
 
 	reservations := []ec2Types.Reservation{}
 	numInstances := 0
@@ -41,7 +41,7 @@ func FetchAllInstances(
 		return reservations, err
 	}
 
-	log.Printf(
+	log.Infof(
 		"Fetched %d %s reservations with a total of %d groups and %d instances",
 		len(reservations), cfg.Region, numGroups, numInstances,
 	)
@@ -52,7 +52,7 @@ func FetchAllEBSVolumes(
 	ctx context.Context,
 	cfg aws.Config,
 ) ([]ec2Types.Volume, error) {
-	log.Printf("Fetching all %s EBS volumes", cfg.Region)
+	log.Debugf("Fetching all %s EBS volumes", cfg.Region)
 
 	volumes := []ec2Types.Volume{}
 
@@ -74,7 +74,7 @@ func FetchAllEBSVolumes(
 		return volumes, err
 	}
 
-	log.Printf("Fetched %d %s volumes", len(volumes), cfg.Region)
+	log.Infof("Fetched %d %s volumes", len(volumes), cfg.Region)
 
 	return volumes, nil
 }

@@ -2,16 +2,16 @@ package loader
 
 import (
 	"context"
-	"log"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/opsworks"
 	opswTypes "github.com/aws/aws-sdk-go-v2/service/opsworks/types"
+	log "github.com/sirupsen/logrus"
 )
 
 func FetchAllOpsworksStacks(ctx context.Context, cfg aws.Config) ([]opswTypes.Stack, error) {
-	log.Print("Fetching all Opsworks stacks")
+	log.Debugf("Fetching all %s Opsworks stacks", cfg.Region)
 	client := opsworks.NewFromConfig(cfg)
 	describeResult, err := client.DescribeStacks(
 		ctx,
@@ -23,12 +23,12 @@ func FetchAllOpsworksStacks(ctx context.Context, cfg aws.Config) ([]opswTypes.St
 		}
 		return nil, err
 	}
-	log.Printf("Fetched %d Opsworks stacks", len(describeResult.Stacks))
+	log.Infof("Fetched %d %s Opsworks stacks", len(describeResult.Stacks), cfg.Region)
 	return describeResult.Stacks, nil
 }
 
 func FetchAllOpsworksLayers(ctx context.Context, cfg aws.Config, stackId string) ([]opswTypes.Layer, error) {
-	log.Printf("Fetching all %s Opsworks layers for stack %s", cfg.Region, stackId)
+	log.Debugf("Fetching all %s Opsworks layers for stack %s", cfg.Region, stackId)
 	client := opsworks.NewFromConfig(cfg)
 	describeResult, err := client.DescribeLayers(
 		ctx,
@@ -37,12 +37,12 @@ func FetchAllOpsworksLayers(ctx context.Context, cfg aws.Config, stackId string)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Fetched %d %s Opsworks layers for stack %s", len(describeResult.Layers), cfg.Region, stackId)
+	log.Debugf("Fetched %d %s Opsworks layers for stack %s", len(describeResult.Layers), cfg.Region, stackId)
 	return describeResult.Layers, nil
 }
 
 func FetchAllOpsworksApps(ctx context.Context, cfg aws.Config, stackId string) ([]opswTypes.App, error) {
-	log.Printf("Fetching all %s Opsworks apps for stack %s", cfg.Region, stackId)
+	log.Debugf("Fetching all %s Opsworks apps for stack %s", cfg.Region, stackId)
 	client := opsworks.NewFromConfig(cfg)
 	describeResult, err := client.DescribeApps(
 		ctx,
@@ -51,12 +51,12 @@ func FetchAllOpsworksApps(ctx context.Context, cfg aws.Config, stackId string) (
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Fetched %d %s Opsworks apps for stack %s", len(describeResult.Apps), cfg.Region, stackId)
+	log.Debugf("Fetched %d %s Opsworks apps for stack %s", len(describeResult.Apps), cfg.Region, stackId)
 	return describeResult.Apps, nil
 }
 
 func FetchAllOpsworksInstances(ctx context.Context, cfg aws.Config, stackId string) ([]opswTypes.Instance, error) {
-	log.Printf("Fetching all %s Opsworks instances for stack %s", cfg.Region, stackId)
+	log.Debugf("Fetching all %s Opsworks instances for stack %s", cfg.Region, stackId)
 	client := opsworks.NewFromConfig(cfg)
 	describeResult, err := client.DescribeInstances(
 		ctx,
@@ -65,7 +65,7 @@ func FetchAllOpsworksInstances(ctx context.Context, cfg aws.Config, stackId stri
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Fetched %d %s Opsworks instances for stack %s", len(describeResult.Instances), cfg.Region, stackId)
+	log.Debugf("Fetched %d %s Opsworks instances for stack %s", len(describeResult.Instances), cfg.Region, stackId)
 
 	return describeResult.Instances, nil
 }

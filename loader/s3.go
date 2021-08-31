@@ -2,15 +2,15 @@ package loader
 
 import (
 	"context"
-	"log"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3Types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	log "github.com/sirupsen/logrus"
 )
 
 func FetchAllBuckets(ctx context.Context, cfg aws.Config) ([]s3Types.Bucket, error) {
-	log.Printf("Fetching all %s S3 buckets", cfg.Region)
+	log.Debugf("Fetching all %s S3 buckets", cfg.Region)
 	client := s3.NewFromConfig(cfg)
 	describeResult, err := client.ListBuckets(
 		ctx,
@@ -19,12 +19,12 @@ func FetchAllBuckets(ctx context.Context, cfg aws.Config) ([]s3Types.Bucket, err
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Fetched %d %s S3 buckets", len(describeResult.Buckets), cfg.Region)
+	log.Infof("Fetched %d %s S3 buckets", len(describeResult.Buckets), cfg.Region)
 	return describeResult.Buckets, nil
 }
 
 func FetchBucketTags(ctx context.Context, cfg aws.Config, bucket string) ([]s3Types.Tag, error) {
-	log.Printf("Fetching tags for %s S3 bucket %s", cfg.Region, bucket)
+	log.Debugf("Fetching tags for %s S3 bucket %s", cfg.Region, bucket)
 	client := s3.NewFromConfig(cfg)
 	result, err := client.GetBucketTagging(
 		ctx,
@@ -33,5 +33,6 @@ func FetchBucketTags(ctx context.Context, cfg aws.Config, bucket string) ([]s3Ty
 	if err != nil {
 		return nil, err
 	}
+	log.Debugf("Fetched %d tags for %s S3 bucket %s", len(result.TagSet), cfg.Region, bucket)
 	return result.TagSet, nil
 }

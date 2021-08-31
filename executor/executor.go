@@ -3,13 +3,17 @@ package executor
 import (
 	"context"
 	"sync"
+	"sync/atomic"
+	"time"
 
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 )
 
 type Executor struct {
-	wg  sync.WaitGroup
-	sem *semaphore.Weighted
+	wg             sync.WaitGroup
+	sem            *semaphore.Weighted
+	launchedAtomic int32
 }
 
 // NewExecutor creates a new executor limited to run at most maxParallelism operations
@@ -23,14 +27,23 @@ func NewExecutor(maxParallelism int) *Executor {
 		wg:  sync.WaitGroup{},
 		sem: sem,
 	}
+	log.Tracef("Created executor %p with max parallelism of %d", &executor, maxParallelism)
 	return &executor
 }
 
 func (e *Executor) Launch(ctx context.Context, fn func()) <-chan struct{} {
 	c := make(chan struct{})
+
 	e.wg.Add(1)
+	fnId := atomic.AddInt32(&e.launchedAtomic, 1) - 1
+
+	queuedAt := time.Now()
+	log.Tracef("Executor %p queued function #%d: %#+v", e, fnId, fn)
+
 	go func() {
 		defer close(c)
+		defer e.wg.Done()
+
 		if e.sem != nil {
 			// sem.Acquire will only return an error if the context gets cancelled
 			// For that reason we do not bother checking the error
@@ -39,9 +52,16 @@ func (e *Executor) Launch(ctx context.Context, fn func()) <-chan struct{} {
 			}
 			defer e.sem.Release(1)
 		}
+
+		runningAt := time.Now()
+		log.Tracef("Executor %p running function #%d: %#+v (waited %v in queue)", e, fnId, fn, runningAt.Sub(queuedAt))
+
 		fn()
-		e.wg.Done()
+
+		finishedAt := time.Now()
+		log.Tracef("Executor %p finished running function #%d: %#+v (executed in %v)", e, fnId, fn, finishedAt.Sub(runningAt))
 	}()
+
 	return c
 }
 
