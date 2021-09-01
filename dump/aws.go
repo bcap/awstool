@@ -1,6 +1,8 @@
 package dump
 
 import (
+	"aws-tools/loader"
+
 	ec2Types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ebtTypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 	elbTypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing/types"
@@ -44,7 +46,7 @@ func NewAWSRegion(region string) AWSRegion {
 
 type IAM struct {
 	Users      []iamTypes.User
-	Roles      []iamTypes.Role
+	Roles      []loader.Role
 	Groups     []iamTypes.Group
 	Policies   []iamTypes.Policy
 	UserGroups map[string][]iamTypes.Group
@@ -54,7 +56,7 @@ type IAM struct {
 func NewIAM() IAM {
 	return IAM{
 		Users:      []iamTypes.User{},
-		Roles:      []iamTypes.Role{},
+		Roles:      []loader.Role{},
 		Groups:     []iamTypes.Group{},
 		Policies:   []iamTypes.Policy{},
 		UserGroups: map[string][]iamTypes.Group{},

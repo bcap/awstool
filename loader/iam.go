@@ -2,12 +2,20 @@ package loader
 
 import (
 	"context"
+	"encoding/json"
+	"net/url"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamTypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	log "github.com/sirupsen/logrus"
 )
+
+type Role struct {
+	iamTypes.Role
+
+	AssumeRolePolicyDocument map[string]interface{}
+}
 
 func FetchAllUsers(
 	ctx context.Context,
@@ -35,9 +43,9 @@ func FetchAllUsers(
 func FetchAllRoles(
 	ctx context.Context,
 	cfg aws.Config,
-) ([]iamTypes.Role, error) {
+) ([]Role, error) {
 	log.Debug("Fetching all IAM roles")
-	roles := []iamTypes.Role{}
+	roles := []Role{}
 	client := iam.NewFromConfig(cfg)
 	load := func(nextToken *string) (*string, error) {
 		result, err := client.ListRoles(ctx, &iam.ListRolesInput{
@@ -46,13 +54,26 @@ func FetchAllRoles(
 		if err != nil {
 			return nil, err
 		}
-		roles = append(roles, result.Roles...)
+		for _, role := range result.Roles {
+			var policyDocObj map[string]interface{}
+			policyDoc, err := url.QueryUnescape(*role.AssumeRolePolicyDocument)
+			if err != nil {
+				log.Warnf("Failed to unescape AssumeRolePolicyDocument for role %s: %v", *role.RoleName, err)
+			} else {
+				if err := json.Unmarshal([]byte(policyDoc), &policyDocObj); err != nil {
+					log.Warnf("Failed to json decode the AssumeRolePolicyDocument for role %s: %v", *role.RoleName, err)
+				}
+			}
+			wrapped := Role{Role: role, AssumeRolePolicyDocument: policyDocObj}
+			roles = append(roles, wrapped)
+		}
 		return result.Marker, nil
 	}
 	err := FetchAll("roles", load)
 	if err != nil {
 		return nil, err
 	}
+
 	log.Infof("Fetched %d IAM roles", len(roles))
 	return roles, nil
 }
