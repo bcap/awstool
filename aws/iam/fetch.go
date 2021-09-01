@@ -1,21 +1,17 @@
-package loader
+package iam
 
 import (
 	"context"
 	"encoding/json"
 	"net/url"
 
+	"aws-tools/common"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamTypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	log "github.com/sirupsen/logrus"
 )
-
-type Role struct {
-	iamTypes.Role
-
-	AssumeRolePolicyDocument map[string]interface{}
-}
 
 func FetchAllUsers(
 	ctx context.Context,
@@ -32,7 +28,7 @@ func FetchAllUsers(
 		users = append(users, result.Users...)
 		return result.Marker, nil
 	}
-	err := FetchAll("users", load)
+	err := common.FetchAll("users", load)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +65,7 @@ func FetchAllRoles(
 		}
 		return result.Marker, nil
 	}
-	err := FetchAll("roles", load)
+	err := common.FetchAll("roles", load)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +89,7 @@ func FetchAllGroups(
 		groups = append(groups, result.Groups...)
 		return result.Marker, nil
 	}
-	err := FetchAll("groups", load)
+	err := common.FetchAll("groups", load)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +114,7 @@ func FetchAllPolicies(
 		policies = append(policies, result.Policies...)
 		return result.Marker, nil
 	}
-	err := FetchAll("policies", load)
+	err := common.FetchAll("policies", load)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +141,7 @@ func FetchAllUserGroups(
 		groups = append(groups, result.Groups...)
 		return result.Marker, nil
 	}
-	err := FetchAll("groups", load)
+	err := common.FetchAll("groups", load)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +168,7 @@ func FetchAllAccessKeys(
 		accessKeys = append(accessKeys, result.AccessKeyMetadata...)
 		return result.Marker, nil
 	}
-	err := FetchAll("accessKeys", load)
+	err := common.FetchAll("accessKeys", load)
 	if err != nil {
 		return nil, err
 	}

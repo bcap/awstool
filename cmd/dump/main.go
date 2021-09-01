@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"aws-tools/cmd"
-	dump "aws-tools/dump"
-	dumphttp "aws-tools/http"
+	"aws-tools/http"
+	"aws-tools/loader"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
@@ -38,7 +38,7 @@ type Options struct {
 	maxRequestsInFlight int
 	maxRetries          int
 	maxRetryTime        time.Duration
-	dumpOptions         []dump.Option
+	loaderOptions       []loader.Option
 }
 
 func (o *Options) validate() error {
@@ -136,11 +136,11 @@ func createCommand() *cobra.Command {
 			}
 		}
 
-		options.dumpOptions = []dump.Option{
-			dump.WithRegions(regions),
-			dump.WithoutRegions(excludeRegions),
-			dump.WithServices(services),
-			dump.WithoutServices(excludeServices),
+		options.loaderOptions = []loader.Option{
+			loader.WithRegions(regions),
+			loader.WithoutRegions(excludeRegions),
+			loader.WithServices(services),
+			loader.WithoutServices(excludeServices),
 		}
 		if err := options.validate(); err != nil {
 			return err
@@ -165,7 +165,7 @@ func run(ctx context.Context, options Options) error {
 		return err
 	}
 
-	result, err := dump.DumpAWS(ctx, cfg, options.dumpOptions...)
+	result, err := loader.LoadAWSAccount(ctx, cfg, options.loaderOptions...)
 	if err != nil {
 		log.Errorf("Execution failed: %v", err)
 		return err
@@ -203,7 +203,7 @@ func setupLogging(verbosity int) {
 }
 
 func createAWSConfig(ctx context.Context, options Options) (aws.Config, error) {
-	httpClient := dumphttp.NewParallelLimitedHTTPClient(
+	httpClient := http.NewParallelLimitedHTTPClient(
 		awshttp.NewBuildableClient(),
 		options.maxRequestsInFlight,
 	)

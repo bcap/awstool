@@ -1,4 +1,4 @@
-package loader
+package region
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func FetchAllRegions(
+func FetchAll(
 	ctx context.Context,
 	cfg aws.Config,
 ) ([]ec2Types.Region, error) {

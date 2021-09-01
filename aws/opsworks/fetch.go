@@ -1,4 +1,4 @@
-package loader
+package opsworks
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func FetchAllOpsworksStacks(ctx context.Context, cfg aws.Config) ([]opswTypes.Stack, error) {
+func FetchAllStacks(ctx context.Context, cfg aws.Config) ([]opswTypes.Stack, error) {
 	log.Debugf("Fetching all %s Opsworks stacks", cfg.Region)
 	client := opsworks.NewFromConfig(cfg)
 	describeResult, err := client.DescribeStacks(
@@ -27,7 +27,7 @@ func FetchAllOpsworksStacks(ctx context.Context, cfg aws.Config) ([]opswTypes.St
 	return describeResult.Stacks, nil
 }
 
-func FetchAllOpsworksLayers(ctx context.Context, cfg aws.Config, stackId string) ([]opswTypes.Layer, error) {
+func FetchAllLayers(ctx context.Context, cfg aws.Config, stackId string) ([]opswTypes.Layer, error) {
 	log.Debugf("Fetching all %s Opsworks layers for stack %s", cfg.Region, stackId)
 	client := opsworks.NewFromConfig(cfg)
 	describeResult, err := client.DescribeLayers(
@@ -41,7 +41,7 @@ func FetchAllOpsworksLayers(ctx context.Context, cfg aws.Config, stackId string)
 	return describeResult.Layers, nil
 }
 
-func FetchAllOpsworksApps(ctx context.Context, cfg aws.Config, stackId string) ([]opswTypes.App, error) {
+func FetchAllApps(ctx context.Context, cfg aws.Config, stackId string) ([]opswTypes.App, error) {
 	log.Debugf("Fetching all %s Opsworks apps for stack %s", cfg.Region, stackId)
 	client := opsworks.NewFromConfig(cfg)
 	describeResult, err := client.DescribeApps(
@@ -55,7 +55,7 @@ func FetchAllOpsworksApps(ctx context.Context, cfg aws.Config, stackId string) (
 	return describeResult.Apps, nil
 }
 
-func FetchAllOpsworksInstances(ctx context.Context, cfg aws.Config, stackId string) ([]opswTypes.Instance, error) {
+func FetchAllInstances(ctx context.Context, cfg aws.Config, stackId string) ([]opswTypes.Instance, error) {
 	log.Debugf("Fetching all %s Opsworks instances for stack %s", cfg.Region, stackId)
 	client := opsworks.NewFromConfig(cfg)
 	describeResult, err := client.DescribeInstances(

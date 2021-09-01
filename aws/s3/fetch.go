@@ -1,4 +1,4 @@
-package loader
+package s3
 
 import (
 	"context"

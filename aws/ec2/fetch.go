@@ -1,7 +1,9 @@
-package loader
+package ec2
 
 import (
 	"context"
+
+	"aws-tools/common"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -36,7 +38,7 @@ func FetchAllInstances(
 		return describeResult.NextToken, nil
 	}
 
-	err := FetchAll("instances", load)
+	err := common.FetchAll("instances", load)
 	if err != nil {
 		return reservations, err
 	}
@@ -69,7 +71,7 @@ func FetchAllEBSVolumes(
 		return describeResult.NextToken, nil
 	}
 
-	err := FetchAll("ebs volumes", load)
+	err := common.FetchAll("ebs volumes", load)
 	if err != nil {
 		return volumes, err
 	}

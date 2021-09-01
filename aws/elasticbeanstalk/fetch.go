@@ -1,4 +1,4 @@
-package loader
+package elasticbeanstalk
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func FetchAllElasticBeanstalkApplications(
+func FetchAllApplications(
 	ctx context.Context,
 	cfg aws.Config,
 ) ([]ebtTypes.ApplicationDescription, error) {
@@ -29,7 +29,7 @@ func FetchAllElasticBeanstalkApplications(
 	return describeResult.Applications, nil
 }
 
-func FetchAllElasticBeanstalkEnvironments(
+func FetchAllEnvironments(
 	ctx context.Context,
 	cfg aws.Config,
 ) ([]ebtTypes.EnvironmentDescription, error) {
