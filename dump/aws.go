@@ -5,17 +5,20 @@ import (
 	ebtTypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 	elbTypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing/types"
 	elbv2Types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	iamTypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	opswTypes "github.com/aws/aws-sdk-go-v2/service/opsworks/types"
 	s3Types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type AWS struct {
 	Regions map[string]AWSRegion
+	IAM     IAM
 }
 
 func NewAWS() AWS {
 	return AWS{
 		Regions: map[string]AWSRegion{},
+		IAM:     NewIAM(),
 	}
 }
 
@@ -36,6 +39,26 @@ func NewAWSRegion(region string) AWSRegion {
 		S3:               NewS3(),
 		Opsworks:         NewOpsworks(),
 		ElasticBeanstalk: NewElasticBeanstalk(),
+	}
+}
+
+type IAM struct {
+	Users      []iamTypes.User
+	Roles      []iamTypes.Role
+	Groups     []iamTypes.Group
+	Policies   []iamTypes.Policy
+	UserGroups map[string][]iamTypes.Group
+	AccessKeys map[string][]iamTypes.AccessKeyMetadata
+}
+
+func NewIAM() IAM {
+	return IAM{
+		Users:      []iamTypes.User{},
+		Roles:      []iamTypes.Role{},
+		Groups:     []iamTypes.Group{},
+		Policies:   []iamTypes.Policy{},
+		UserGroups: map[string][]iamTypes.Group{},
+		AccessKeys: map[string][]iamTypes.AccessKeyMetadata{},
 	}
 }
 

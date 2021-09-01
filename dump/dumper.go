@@ -80,7 +80,7 @@ func newOptions(fns []Option) options {
 func DumpAWS(ctx context.Context, cfg aws.Config, options ...Option) (AWS, error) {
 	opts := newOptions(options)
 	result := NewAWS()
-	errors := []error{}
+	errorsCh := make(chan error)
 	var resultLock sync.Mutex
 
 	regions, err := getRegions(ctx, cfg, opts)
@@ -93,18 +93,30 @@ func DumpAWS(ctx context.Context, cfg aws.Config, options ...Option) (AWS, error
 		regionRef := region
 		executor.Launch(ctx, func() {
 			regionDump, err := DumpAWSRegion(ctx, cfg, regionRef, options...)
-			resultLock.Lock()
 			if err != nil {
-				errors = append(errors, err)
+				errorsCh <- err
+				return
 			}
+			resultLock.Lock()
 			result.Regions[regionRef] = regionDump
 			resultLock.Unlock()
 		})
 	}
 
-	err = executor.Wait(ctx)
-	if err != nil {
-		return result, err
+	// global services
+	if shouldFetchService("iam", opts) {
+		fetchIAM(ctx, cfg, executor, errorsCh, &result)
+	}
+
+	errors := make([]error, 0)
+	consume := true
+	for consume {
+		select {
+		case <-executor.Done():
+			consume = false
+		case err := <-errorsCh:
+			errors = append(errors, err)
+		}
 	}
 	if len(errors) > 0 {
 		return result, common.NewErrors(errors)
@@ -150,6 +162,74 @@ func DumpAWSRegion(ctx context.Context, cfg aws.Config, region string, options .
 	}
 
 	return result, nil
+}
+
+func fetchIAM(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *AWS) {
+	usersDoneCh := executor.Launch(ctx, func() {
+		users, err := loader.FetchAllUsers(ctx, cfg)
+		if err != nil {
+			errorsCh <- fmt.Errorf("error while fetching all IAM users: %w", err)
+		}
+		result.IAM.Users = users
+	})
+
+	executor.Launch(ctx, func() {
+		roles, err := loader.FetchAllRoles(ctx, cfg)
+		if err != nil {
+			errorsCh <- fmt.Errorf("error while fetching all IAM roles: %w", err)
+		}
+		result.IAM.Roles = roles
+	})
+
+	executor.Launch(ctx, func() {
+		groups, err := loader.FetchAllGroups(ctx, cfg)
+		if err != nil {
+			errorsCh <- fmt.Errorf("error while fetching all IAM groups: %w", err)
+		}
+		result.IAM.Groups = groups
+	})
+
+	executor.Launch(ctx, func() {
+		policies, err := loader.FetchAllPolicies(ctx, cfg)
+		if err != nil {
+			errorsCh <- fmt.Errorf("error while fetching all IAM policies: %w", err)
+		}
+		result.IAM.Policies = policies
+	})
+
+	executor.Launch(ctx, func() {
+		<-usersDoneCh
+		var lock sync.Mutex
+		for _, user := range result.IAM.Users {
+			username := *user.UserName
+			executor.Launch(ctx, func() {
+				accessKeys, err := loader.FetchAllAccessKeys(ctx, cfg, username)
+				if err != nil {
+					errorsCh <- fmt.Errorf("error while fetching all IAM access keys for %s: %w", username, err)
+				}
+				lock.Lock()
+				result.IAM.AccessKeys[username] = accessKeys
+				lock.Unlock()
+			})
+		}
+	})
+
+	executor.Launch(ctx, func() {
+		<-usersDoneCh
+		var lock sync.Mutex
+		for _, user := range result.IAM.Users {
+			username := *user.UserName
+			executor.Launch(ctx, func() {
+				groups, err := loader.FetchAllUserGroups(ctx, cfg, username)
+				if err != nil {
+					errorsCh <- fmt.Errorf("error while fetching all IAM user groups for %s: %w", username, err)
+				}
+				lock.Lock()
+				result.IAM.UserGroups[username] = groups
+				lock.Unlock()
+			})
+		}
+	})
 }
 
 func fetchEC2(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *AWSRegion) {

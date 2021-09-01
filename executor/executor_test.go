@@ -16,6 +16,18 @@ func TestBasic(t *testing.T) {
 	e := NewExecutor(1)
 	c := make(chan struct{})
 
+	timeoutCtx, _ := context.WithTimeout(ctx, time.Second)
+	err := e.Wait(timeoutCtx)
+	if err != nil {
+		t.Fatal("executor Wait call should return instantly when no jobs were launched")
+	}
+
+	select {
+	case <-e.Done():
+	case <-time.After(time.Second):
+		t.Fatal("waiting on executor Done() channel should return instantly when no jobs were launched")
+	}
+
 	e.Launch(ctx, func() {
 		close(c)
 	})
@@ -23,13 +35,19 @@ func TestBasic(t *testing.T) {
 	select {
 	case <-c:
 	case <-time.After(time.Second):
-		t.Fatal("simple execution should have finished instantly")
+		t.Fatal("simple execution should have finished instantly when waiting on job returned channel")
+	}
+
+	timeoutCtx, _ = context.WithTimeout(ctx, time.Second)
+	err = e.Wait(timeoutCtx)
+	if err != nil {
+		t.Fatal("simple execution should have finished instantly when waiting on executor Wait call")
 	}
 
 	select {
 	case <-e.Done():
-	case <-time.After(10 * time.Second):
-		t.Fatal("executor should have finished < 10s (likely in the ms scale). Its likely deadlocked")
+	case <-time.After(time.Second):
+		t.Fatal("simple execution should have finished instantly when waiting on executor Done channel")
 	}
 }
 

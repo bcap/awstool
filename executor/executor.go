@@ -27,7 +27,7 @@ func NewExecutor(maxParallelism int) *Executor {
 		wg:  sync.WaitGroup{},
 		sem: sem,
 	}
-	log.Tracef("Created executor %p with max parallelism of %d", &executor, maxParallelism)
+	log.Tracef("Executor %p created with max parallelism of %d", &executor, maxParallelism)
 	return &executor
 }
 
@@ -38,7 +38,7 @@ func (e *Executor) Launch(ctx context.Context, fn func()) <-chan struct{} {
 	fnId := atomic.AddInt32(&e.launchedAtomic, 1) - 1
 
 	queuedAt := time.Now()
-	log.Tracef("Executor %p queued function #%d: %#+v", e, fnId, fn)
+	log.Tracef("Executor %p queued function #%d at %p", e, fnId, fn)
 
 	go func() {
 		defer close(c)
@@ -54,12 +54,12 @@ func (e *Executor) Launch(ctx context.Context, fn func()) <-chan struct{} {
 		}
 
 		runningAt := time.Now()
-		log.Tracef("Executor %p running function #%d: %#+v (waited %v in queue)", e, fnId, fn, runningAt.Sub(queuedAt))
+		log.Tracef("Executor %p running function #%d at %p (waited %v in queue)", e, fnId, fn, runningAt.Sub(queuedAt))
 
 		fn()
 
 		finishedAt := time.Now()
-		log.Tracef("Executor %p finished running function #%d: %#+v (executed in %v)", e, fnId, fn, finishedAt.Sub(runningAt))
+		log.Tracef("Executor %p finished running function #%d at %p (executed in %v)", e, fnId, fn, finishedAt.Sub(runningAt))
 	}()
 
 	return c
@@ -75,10 +75,16 @@ func (e *Executor) Done() <-chan struct{} {
 }
 
 func (e *Executor) Wait(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-e.Done():
-		return nil
+	for {
+		select {
+		case <-ctx.Done():
+			log.Tracef("Executor %p is done due to context cancellation", e)
+			return ctx.Err()
+		case <-e.Done():
+			log.Tracef("Executor %p is done", e)
+			return nil
+		case <-time.After(30 * time.Second):
+			log.Tracef("Executor %p still being waited on", e)
+		}
 	}
 }
