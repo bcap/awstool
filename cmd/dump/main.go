@@ -197,6 +197,7 @@ func setupLogging(verbosity int) {
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp: true,
 		PadLevelText:  true,
+		ForceColors:   true,
 	})
 	log.SetOutput(os.Stderr)
 }
