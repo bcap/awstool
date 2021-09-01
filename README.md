@@ -26,15 +26,15 @@ In case you have multiple aws accounts, be sure to use the `--profile` flag in t
 
 There are a few ways to execute the tools:
 
-- Using local go: 
+Using local go: 
 
     go run cmd/dump/main.go -h
 
-- Using docker directly: 
+Using docker directly: 
 
     docker build -t aws-tools
     docker run -v ~/.aws:/root/.aws -a stdout -a stderr aws-tools dump -h
 
-- Using `run.sh`, which wraps building and running through docker:
+Using `run.sh`, which wraps building and running through docker:
 
     ./run.sh dump -h
