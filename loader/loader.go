@@ -13,6 +13,7 @@ import (
 	"aws-tools/aws/elb"
 	"aws-tools/aws/iam"
 	"aws-tools/aws/opsworks"
+	"aws-tools/aws/organizations"
 	"aws-tools/aws/region"
 	"aws-tools/aws/s3"
 	"aws-tools/common"
@@ -21,9 +22,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
-func LoadAWSAccount(ctx context.Context, cfg aws.Config, options ...Option) (awst.Account, error) {
+func LoadAWS(ctx context.Context, cfg aws.Config, options ...Option) (awst.AWS, error) {
 	opts := newOptions(options)
-	result := awst.NewAccount()
+	result := awst.New()
 	errorsCh := make(chan error)
 	var resultLock sync.Mutex
 
@@ -50,6 +51,9 @@ func LoadAWSAccount(ctx context.Context, cfg aws.Config, options ...Option) (aws
 	// global services
 	if shouldFetchService("iam", opts) {
 		fetchIAM(ctx, cfg, executor, errorsCh, &result)
+	}
+	if shouldFetchService("organizations", opts) {
+		fetchOrganization(ctx, cfg, executor, errorsCh, &result)
 	}
 
 	errors := make([]error, 0)
@@ -108,7 +112,27 @@ func LoadRegion(ctx context.Context, cfg aws.Config, region string, options ...O
 	return result, nil
 }
 
-func fetchIAM(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.Account) {
+func fetchOrganization(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.AWS) {
+	executor.Launch(ctx, func() {
+		org, err := organizations.FetchOrganization(ctx, cfg)
+		if err != nil {
+			errorsCh <- fmt.Errorf("error while fetching organization: %w", err)
+		}
+		result.Organization = org
+	})
+
+	executor.Launch(ctx, func() {
+		accounts, err := organizations.FetchAllAccounts(ctx, cfg)
+		if err != nil {
+			errorsCh <- fmt.Errorf("error while fetching all accounts: %w", err)
+		}
+		for _, account := range accounts {
+			result.Accounts[*account.Name] = account
+		}
+	})
+}
+
+func fetchIAM(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.AWS) {
 	usersDoneCh := executor.Launch(ctx, func() {
 		users, err := iam.FetchAllUsers(ctx, cfg)
 		if err != nil {

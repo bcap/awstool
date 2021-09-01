@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"aws-tools/cmd"
@@ -25,7 +24,7 @@ func main() {
 	ctx, cancel := cmd.CreateRunnableContext()
 	defer cancel()
 
-	cmd.KeepLoggingMemoryUsage(ctx, 15*time.Second)
+	cmd.KeepLoggingMemoryUsage(ctx, 15*time.Second, log.TraceLevel)
 
 	cmd := createCommand()
 	if err := cmd.ExecuteContext(ctx); err != nil {
@@ -166,7 +165,7 @@ func run(ctx context.Context, options Options) error {
 		return err
 	}
 
-	result, err := loader.LoadAWSAccount(ctx, cfg, options.loaderOptions...)
+	result, err := loader.LoadAWS(ctx, cfg, options.loaderOptions...)
 	if err != nil {
 		log.Errorf("Execution failed: %v", err)
 		return err
@@ -179,9 +178,10 @@ func run(ctx context.Context, options Options) error {
 		return err
 	}
 
-	b := strings.Builder{}
-	b.Write(jsonBytes)
-	fmt.Println(b.String())
+	// using raw os.Stdout.Write([]byte) to avoid copying potentially huge json byte
+	// data to string
+	os.Stdout.Write(jsonBytes)
+	os.Stdout.Write([]byte{'\n'})
 
 	log.Debug("Done")
 

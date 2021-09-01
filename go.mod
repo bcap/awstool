@@ -12,6 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.6.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/iam v1.9.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/opsworks v1.4.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/organizations v1.6.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/pricing v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.12.0 // indirect
 	github.com/aws/smithy-go v1.8.0 // indirect

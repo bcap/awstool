@@ -77,6 +77,8 @@ github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.5.2 h1:ewIpdVz12MDinJJ
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.5.2/go.mod h1:QuL2Ym8BkrLmN4lUofXYq6000/i5jPjosCNK//t6gak=
 github.com/aws/aws-sdk-go-v2/service/opsworks v1.4.3 h1:oX5h3qetFc32eDF8w72BXvxL1r0RtCiKrHINNYtp/T8=
 github.com/aws/aws-sdk-go-v2/service/opsworks v1.4.3/go.mod h1:+MmYy1e9oSs8fsUhaKueR6fbrtp9Q0v54JhvvAa+eoE=
+github.com/aws/aws-sdk-go-v2/service/organizations v1.6.0 h1:acyXYEubqdYmIYA0b0WcVv9gmVEprTZ9JEFT2EaYJrs=
+github.com/aws/aws-sdk-go-v2/service/organizations v1.6.0/go.mod h1:5hpMtMUHuAKnHWEP9dZ8qcQdDy6AkiZz4rLRUnlQzWM=
 github.com/aws/aws-sdk-go-v2/service/pricing v1.5.2 h1:wJ4FuEP379xwNSUrmEl3hl49PhZGIDmgfzBxlv/VgLY=
 github.com/aws/aws-sdk-go-v2/service/pricing v1.5.2/go.mod h1:QJKLqL1G8KtI9jf7zuTIMl2GkIq4xFsMOp8RHeU54eU=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.12.0 h1:cxZbzTYXgiQrZ6u2/RJZAkkgZssqYOdydvJPBgIHlsM=

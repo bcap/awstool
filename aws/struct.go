@@ -8,18 +8,22 @@ import (
 	elbTypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing/types"
 	elbv2Types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	opswTypes "github.com/aws/aws-sdk-go-v2/service/opsworks/types"
+	orgTypes "github.com/aws/aws-sdk-go-v2/service/organizations/types"
 	s3Types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-type Account struct {
-	Regions map[string]Region
-	IAM     iam.IAM
+type AWS struct {
+	Organization orgTypes.Organization
+	Accounts     map[string]orgTypes.Account
+	Regions      map[string]Region
+	IAM          iam.IAM
 }
 
-func NewAccount() Account {
-	return Account{
-		Regions: map[string]Region{},
-		IAM:     iam.New(),
+func New() AWS {
+	return AWS{
+		Accounts: map[string]orgTypes.Account{},
+		Regions:  map[string]Region{},
+		IAM:      iam.New(),
 	}
 }
 
