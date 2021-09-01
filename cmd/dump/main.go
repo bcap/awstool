@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"aws-tools/cmd"
@@ -178,7 +179,9 @@ func run(ctx context.Context, options Options) error {
 		return err
 	}
 
-	fmt.Println(string(jsonBytes))
+	b := strings.Builder{}
+	b.Write(jsonBytes)
+	fmt.Println(b.String())
 
 	log.Debug("Done")
 
