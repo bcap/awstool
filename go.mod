@@ -16,6 +16,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/pricing v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.12.0 // indirect
 	github.com/aws/smithy-go v1.8.0 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spf13/cobra v1.2.1
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect

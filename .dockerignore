@@ -2,4 +2,4 @@
 *.json
 Dockerfile
 README.md
-run.sh
+aws-tools.sh

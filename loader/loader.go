@@ -22,15 +22,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
-func LoadAWS(ctx context.Context, cfg aws.Config, options ...Option) (awst.AWS, error) {
+func LoadAWS(ctx context.Context, cfg aws.Config, options ...Option) (*awst.AWS, error) {
 	opts := newOptions(options)
 	result := awst.New()
 	errorsCh := make(chan error)
 	var resultLock sync.Mutex
 
-	regions, err := getRegions(ctx, cfg, opts)
+	regions, err := GetRegions(ctx, cfg, options...)
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 
 	executor := executor.NewExecutor(0)
@@ -48,12 +48,10 @@ func LoadAWS(ctx context.Context, cfg aws.Config, options ...Option) (awst.AWS, 
 		})
 	}
 
-	// global services
-	if shouldFetchService("iam", opts) {
-		fetchIAM(ctx, cfg, executor, errorsCh, &result)
-	}
-	if shouldFetchService("organizations", opts) {
-		fetchOrganization(ctx, cfg, executor, errorsCh, &result)
+	for svc, fn := range globalServicesFetchFunctions() {
+		if shouldFetchService(svc, opts) {
+			fn(ctx, cfg, executor, errorsCh, &result, opts)
+		}
 	}
 
 	errors := make([]error, 0)
@@ -67,30 +65,22 @@ func LoadAWS(ctx context.Context, cfg aws.Config, options ...Option) (awst.AWS, 
 		}
 	}
 	if len(errors) > 0 {
-		return result, common.NewErrors(errors)
+		return nil, common.NewErrors(errors)
 	}
 
-	return result, err
+	return &result, err
 }
 
 func LoadRegion(ctx context.Context, cfg aws.Config, region string, options ...Option) (awst.Region, error) {
 	cfg.Region = region
 
-	servicesCfg := map[string]func(context.Context, aws.Config, *executor.Executor, chan<- error, *awst.Region){
-		"ec2":              fetchEC2,
-		"elb":              fetchELBs,
-		"s3":               fetchS3,
-		"opsworks":         fetchOpsworks,
-		"elasticbeanstalk": fetchElasticBeanstalk,
-	}
-
 	opts := newOptions(options)
 	result := awst.NewRegion(region)
 	errorsCh := make(chan error)
 	executor := executor.NewExecutor(0)
-	for svc, fn := range servicesCfg {
+	for svc, fn := range regionalServicesFetchFunctions() {
 		if shouldFetchService(svc, opts) {
-			fn(ctx, cfg, executor, errorsCh, &result)
+			fn(ctx, cfg, executor, errorsCh, &result, opts)
 		}
 	}
 
@@ -112,7 +102,40 @@ func LoadRegion(ctx context.Context, cfg aws.Config, region string, options ...O
 	return result, nil
 }
 
-func fetchOrganization(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.AWS) {
+func ListServices() []string {
+	result := []string{}
+	for svc, _ := range globalServicesFetchFunctions() {
+		result = append(result, svc)
+	}
+	for svc, _ := range regionalServicesFetchFunctions() {
+		result = append(result, svc)
+	}
+	sort.Strings(result)
+	return result
+}
+
+type globalServiceFetchFunc = func(context.Context, aws.Config, *executor.Executor, chan<- error, *awst.AWS, options)
+type regionalServiceFetchFunc = func(context.Context, aws.Config, *executor.Executor, chan<- error, *awst.Region, options)
+
+func globalServicesFetchFunctions() map[string]globalServiceFetchFunc {
+	return map[string]globalServiceFetchFunc{
+		"iam":           fetchIAM,
+		"organizations": fetchOrganization,
+	}
+}
+
+func regionalServicesFetchFunctions() map[string]regionalServiceFetchFunc {
+	return map[string]regionalServiceFetchFunc{
+		"ec2":              fetchEC2,
+		"ebs":              fetchEBS,
+		"elb":              fetchELBs,
+		"s3":               fetchS3,
+		"opsworks":         fetchOpsworks,
+		"elasticbeanstalk": fetchElasticBeanstalk,
+	}
+}
+
+func fetchOrganization(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.AWS, options options) {
 	executor.Launch(ctx, func() {
 		org, err := organizations.FetchOrganization(ctx, cfg)
 		if err != nil {
@@ -132,7 +155,7 @@ func fetchOrganization(ctx context.Context, cfg aws.Config, executor *executor.E
 	})
 }
 
-func fetchIAM(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.AWS) {
+func fetchIAM(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.AWS, options options) {
 	usersDoneCh := executor.Launch(ctx, func() {
 		users, err := iam.FetchAllUsers(ctx, cfg)
 		if err != nil {
@@ -200,15 +223,17 @@ func fetchIAM(ctx context.Context, cfg aws.Config, executor *executor.Executor, 
 	})
 }
 
-func fetchEC2(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.Region) {
+func fetchEC2(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.Region, options options) {
 	executor.Launch(ctx, func() {
-		reservations, err := ec2.FetchAllInstances(ctx, cfg)
+		reservations, err := ec2.FetchAllInstances(ctx, cfg, options.ec2FetchOptions...)
 		if err != nil {
 			errorsCh <- fmt.Errorf("error while fetching all EC2 instances: %w", err)
 		}
 		result.EC2.Reservations = reservations
 	})
+}
 
+func fetchEBS(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.Region, options options) {
 	executor.Launch(ctx, func() {
 		volumes, err := ec2.FetchAllEBSVolumes(ctx, cfg)
 		if err != nil {
@@ -218,7 +243,7 @@ func fetchEC2(ctx context.Context, cfg aws.Config, executor *executor.Executor, 
 	})
 }
 
-func fetchS3(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.Region) {
+func fetchS3(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.Region, options options) {
 	bucketsDoneCh := executor.Launch(ctx, func() {
 		buckets, err := s3.FetchAllBuckets(ctx, cfg)
 		if err != nil {
@@ -246,7 +271,7 @@ func fetchS3(ctx context.Context, cfg aws.Config, executor *executor.Executor, e
 
 }
 
-func fetchELBs(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.Region) {
+func fetchELBs(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.Region, options options) {
 	executor.Launch(ctx, func() {
 		elbs, err := elb.FetchAllV1ELBs(ctx, cfg)
 		if err != nil {
@@ -264,7 +289,7 @@ func fetchELBs(ctx context.Context, cfg aws.Config, executor *executor.Executor,
 	})
 }
 
-func fetchOpsworks(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.Region) {
+func fetchOpsworks(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.Region, options options) {
 	stacksDoneCh := executor.Launch(ctx, func() {
 		stacks, err := opsworks.FetchAllStacks(ctx, cfg)
 		if err != nil {
@@ -314,7 +339,7 @@ func fetchOpsworks(ctx context.Context, cfg aws.Config, executor *executor.Execu
 	})
 }
 
-func fetchElasticBeanstalk(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.Region) {
+func fetchElasticBeanstalk(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.Region, options options) {
 	executor.Launch(ctx, func() {
 		apps, err := elasticbeanstalk.FetchAllApplications(ctx, cfg)
 		if err != nil {
@@ -332,9 +357,10 @@ func fetchElasticBeanstalk(ctx context.Context, cfg aws.Config, executor *execut
 	})
 }
 
-func getRegions(ctx context.Context, cfg aws.Config, options options) ([]string, error) {
+func GetRegions(ctx context.Context, cfg aws.Config, options ...Option) ([]string, error) {
+	opts := newOptions(options)
 	// If no regions were passed in, them include all
-	regions := options.includeRegions
+	regions := opts.includeRegions
 	if len(regions) == 0 {
 		regionObjs, err := region.FetchAll(ctx, cfg)
 		if err != nil {
@@ -346,7 +372,7 @@ func getRegions(ctx context.Context, cfg aws.Config, options options) ([]string,
 	}
 
 	// Remove exclusions
-	for region, _ := range options.excludeRegions {
+	for region, _ := range opts.excludeRegions {
 		delete(regions, region)
 	}
 

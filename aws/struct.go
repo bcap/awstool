@@ -1,4 +1,4 @@
-package dump
+package aws
 
 import (
 	"aws-tools/aws/iam"

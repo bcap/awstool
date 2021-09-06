@@ -1,9 +1,7 @@
 #!/bin/bash
 
-set -e -o pipefail
+set -e -o pipefail -x
 
 cd $(dirname $0)
 
-IMAGE="$(docker build -q .)"
-
-docker run --rm -v ~/.aws:/root/.aws -a stdout -a stderr $IMAGE $@
+docker run --rm -v ~/.aws:/root/.aws -a stdout -a stderr aws-tools $@

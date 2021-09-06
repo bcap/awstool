@@ -1,10 +1,10 @@
 FROM golang:alpine as build
 WORKDIR /app
 COPY . .
-RUN ["go", "build", "-o", "bin/dump", "cmd/dump/main.go"]
+RUN ["sh", "-c", "go build -o bin/aws-tools cmd/aws-tools/*.go"]
 
 FROM alpine
 WORKDIR /app
-ENV PATH="$PATH:/app"
-COPY --from=build /app/bin/dump dump
+COPY --from=build /app/bin/aws-tools /app/aws-tools
 VOLUME /root/.aws
+ENTRYPOINT [ "/app/aws-tools" ]
