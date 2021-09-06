@@ -4,7 +4,6 @@ COPY . .
 RUN ["sh", "-c", "go build -o bin/aws-tools cmd/aws-tools/*.go"]
 
 FROM alpine
-WORKDIR /app
 COPY --from=build /app/bin/aws-tools /app/aws-tools
 VOLUME /root/.aws
 ENTRYPOINT [ "/app/aws-tools" ]
