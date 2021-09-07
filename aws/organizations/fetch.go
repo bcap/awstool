@@ -10,15 +10,15 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func FetchOrganization(ctx context.Context, cfg aws.Config) (orgTypes.Organization, error) {
+func FetchOrganization(ctx context.Context, cfg aws.Config) (*orgTypes.Organization, error) {
 	log.Debug("Fetching organization")
 	client := organizations.NewFromConfig(cfg)
 	result, err := client.DescribeOrganization(ctx, &organizations.DescribeOrganizationInput{})
 	if err != nil {
-		return orgTypes.Organization{}, err
+		return nil, err
 	}
 	log.Info("Fetched organization")
-	return *result.Organization, nil
+	return result.Organization, nil
 }
 
 func FetchAllAccounts(ctx context.Context, cfg aws.Config) ([]orgTypes.Account, error) {

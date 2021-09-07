@@ -10,6 +10,7 @@ import (
 	awst "awstool/aws"
 	"awstool/aws/ec2"
 	"awstool/aws/elasticbeanstalk"
+	"awstool/aws/elasticsearch"
 	"awstool/aws/elb"
 	"awstool/aws/iam"
 	"awstool/aws/opsworks"
@@ -21,6 +22,69 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 )
+
+type globalServiceFetchFunc = func(context.Context, aws.Config, *executor.Executor, chan<- error, *awst.AWS, options)
+type regionalServiceFetchFunc = func(context.Context, aws.Config, *executor.Executor, chan<- error, *awst.Region, options)
+
+func globalServicesFetchFunctions() map[string]globalServiceFetchFunc {
+	return map[string]globalServiceFetchFunc{
+		"iam":           fetchIAM,
+		"organizations": fetchOrganization,
+	}
+}
+
+func regionalServicesFetchFunctions() map[string]regionalServiceFetchFunc {
+	return map[string]regionalServiceFetchFunc{
+		"ec2":              fetchEC2,
+		"ebs":              fetchEBS,
+		"elb":              fetchELBs,
+		"s3":               fetchS3,
+		"opsworks":         fetchOpsworks,
+		"elasticbeanstalk": fetchElasticBeanstalk,
+		"elasticsearch":    fetchElasticsearch,
+	}
+}
+
+func ListServices() []string {
+	result := []string{}
+	for svc, _ := range globalServicesFetchFunctions() {
+		result = append(result, svc)
+	}
+	for svc, _ := range regionalServicesFetchFunctions() {
+		result = append(result, svc)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func GetRegions(ctx context.Context, cfg aws.Config, options ...Option) ([]string, error) {
+	opts := newOptions(options)
+	// If no regions were passed in, them include all
+	regions := opts.includeRegions
+	if len(regions) == 0 {
+		regionObjs, err := region.FetchAll(ctx, cfg)
+		if err != nil {
+			return nil, err
+		}
+		for _, regionObj := range regionObjs {
+			regions[*regionObj.RegionName] = struct{}{}
+		}
+	}
+
+	// Remove exclusions
+	for region, _ := range opts.excludeRegions {
+		delete(regions, region)
+	}
+
+	// convert to sorted string slice
+	result := make([]string, 0, len(regions))
+	for region, _ := range regions {
+		result = append(result, region)
+	}
+	sort.Strings(result)
+
+	return result, nil
+}
 
 func LoadAWS(ctx context.Context, cfg aws.Config, options ...Option) (*awst.AWS, error) {
 	opts := newOptions(options)
@@ -100,39 +164,6 @@ func LoadRegion(ctx context.Context, cfg aws.Config, region string, options ...O
 	}
 
 	return result, nil
-}
-
-func ListServices() []string {
-	result := []string{}
-	for svc, _ := range globalServicesFetchFunctions() {
-		result = append(result, svc)
-	}
-	for svc, _ := range regionalServicesFetchFunctions() {
-		result = append(result, svc)
-	}
-	sort.Strings(result)
-	return result
-}
-
-type globalServiceFetchFunc = func(context.Context, aws.Config, *executor.Executor, chan<- error, *awst.AWS, options)
-type regionalServiceFetchFunc = func(context.Context, aws.Config, *executor.Executor, chan<- error, *awst.Region, options)
-
-func globalServicesFetchFunctions() map[string]globalServiceFetchFunc {
-	return map[string]globalServiceFetchFunc{
-		"iam":           fetchIAM,
-		"organizations": fetchOrganization,
-	}
-}
-
-func regionalServicesFetchFunctions() map[string]regionalServiceFetchFunc {
-	return map[string]regionalServiceFetchFunc{
-		"ec2":              fetchEC2,
-		"ebs":              fetchEBS,
-		"elb":              fetchELBs,
-		"s3":               fetchS3,
-		"opsworks":         fetchOpsworks,
-		"elasticbeanstalk": fetchElasticBeanstalk,
-	}
 }
 
 func fetchOrganization(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.AWS, options options) {
@@ -343,7 +374,7 @@ func fetchElasticBeanstalk(ctx context.Context, cfg aws.Config, executor *execut
 	executor.Launch(ctx, func() {
 		apps, err := elasticbeanstalk.FetchAllApplications(ctx, cfg)
 		if err != nil {
-			errorsCh <- fmt.Errorf("error while fetching all Opsworks stacks: %w", err)
+			errorsCh <- fmt.Errorf("error while fetching all Elasticbeanstalk applications: %w", err)
 		}
 		result.ElasticBeanstalk.Applications = apps
 	})
@@ -351,39 +382,55 @@ func fetchElasticBeanstalk(ctx context.Context, cfg aws.Config, executor *execut
 	executor.Launch(ctx, func() {
 		envs, err := elasticbeanstalk.FetchAllEnvironments(ctx, cfg)
 		if err != nil {
-			errorsCh <- fmt.Errorf("error while fetching all Opsworks stacks: %w", err)
+			errorsCh <- fmt.Errorf("error while fetching all Elasticbeanstalk environments: %w", err)
 		}
 		result.ElasticBeanstalk.Environments = envs
 	})
 }
 
-func GetRegions(ctx context.Context, cfg aws.Config, options ...Option) ([]string, error) {
-	opts := newOptions(options)
-	// If no regions were passed in, them include all
-	regions := opts.includeRegions
-	if len(regions) == 0 {
-		regionObjs, err := region.FetchAll(ctx, cfg)
+func fetchElasticsearch(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.Region, options options) {
+	executor.Launch(ctx, func() {
+		domains, err := elasticsearch.ListAllDomainNames(ctx, cfg)
 		if err != nil {
-			return nil, err
+			errorsCh <- fmt.Errorf("error while listing all Elasticsearch domain names: %w", err)
+			return
 		}
-		for _, regionObj := range regionObjs {
-			regions[*regionObj.RegionName] = struct{}{}
+
+		var lock sync.Mutex
+		domainResult := func(domain string) *awst.ElasticsearchDomain {
+			lock.Lock()
+			defer lock.Unlock()
+			domainResult, ok := result.Elasticsearch.Domains[domain]
+			if ok {
+				return domainResult
+			}
+			domainResult = &awst.ElasticsearchDomain{}
+			result.Elasticsearch.Domains[domain] = domainResult
+			return domainResult
 		}
-	}
 
-	// Remove exclusions
-	for region, _ := range opts.excludeRegions {
-		delete(regions, region)
-	}
+		for _, d := range domains {
+			domain := d
 
-	// convert to sorted string slice
-	result := make([]string, 0, len(regions))
-	for region, _ := range regions {
-		result = append(result, region)
-	}
-	sort.Strings(result)
+			executor.Launch(ctx, func() {
+				status, err := elasticsearch.FetchDomainStatus(ctx, cfg, domain)
+				if err != nil {
+					errorsCh <- fmt.Errorf("error while fetching the status for Elasticsearch domain %s: %w", domain, err)
+					return
+				}
+				domainResult(domain).Status = status
+			})
 
-	return result, nil
+			executor.Launch(ctx, func() {
+				config, err := elasticsearch.FetchDomainConfig(ctx, cfg, domain)
+				if err != nil {
+					errorsCh <- fmt.Errorf("error while fetching the config for Elasticsearch domain %s: %w", domain, err)
+					return
+				}
+				domainResult(domain).Config = config
+			})
+		}
+	})
 }
 
 func shouldFetchService(service string, options options) bool {

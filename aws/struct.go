@@ -7,13 +7,14 @@ import (
 	ebtTypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 	elbTypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing/types"
 	elbv2Types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	esTypes "github.com/aws/aws-sdk-go-v2/service/elasticsearchservice/types"
 	opswTypes "github.com/aws/aws-sdk-go-v2/service/opsworks/types"
 	orgTypes "github.com/aws/aws-sdk-go-v2/service/organizations/types"
 	s3Types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type AWS struct {
-	Organization orgTypes.Organization
+	Organization *orgTypes.Organization
 	Accounts     map[string]orgTypes.Account
 	Regions      map[string]Region
 	IAM          iam.IAM
@@ -34,6 +35,7 @@ type Region struct {
 	S3               S3
 	Opsworks         Opsworks
 	ElasticBeanstalk ElasticBeanstalk
+	Elasticsearch    Elasticsearch
 }
 
 func NewRegion(region string) Region {
@@ -44,6 +46,7 @@ func NewRegion(region string) Region {
 		S3:               NewS3(),
 		Opsworks:         NewOpsworks(),
 		ElasticBeanstalk: NewElasticBeanstalk(),
+		Elasticsearch:    NewElasticsearch(),
 	}
 }
 
@@ -120,5 +123,20 @@ func NewElasticBeanstalk() ElasticBeanstalk {
 	return ElasticBeanstalk{
 		Applications: []ebtTypes.ApplicationDescription{},
 		Environments: []ebtTypes.EnvironmentDescription{},
+	}
+}
+
+type ElasticsearchDomain struct {
+	Status *esTypes.ElasticsearchDomainStatus
+	Config *esTypes.ElasticsearchDomainConfig
+}
+
+type Elasticsearch struct {
+	Domains map[string]*ElasticsearchDomain
+}
+
+func NewElasticsearch() Elasticsearch {
+	return Elasticsearch{
+		Domains: map[string]*ElasticsearchDomain{},
 	}
 }

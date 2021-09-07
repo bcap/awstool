@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk v1.5.2
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing v1.5.2
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.6.1
+	github.com/aws/aws-sdk-go-v2/service/elasticsearchservice v1.6.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/iam v1.9.0
 	github.com/aws/aws-sdk-go-v2/service/opsworks v1.4.3
 	github.com/aws/aws-sdk-go-v2/service/organizations v1.6.0
