@@ -1,7 +1,7 @@
 package organizations
 
 import (
-	"aws-tools/common"
+	"awstool/common"
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/aws"

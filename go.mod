@@ -1,4 +1,4 @@
-module aws-tools
+module awstool
 
 go 1.16
 

@@ -17,5 +17,5 @@ log "pushing changes to github"
 git push 
 
 log "building and pushing docker image"
-IMG=bcap/aws-tools:latest
+IMG=bcap/awstool:latest
 docker build -t $IMG . && docker push $IMG

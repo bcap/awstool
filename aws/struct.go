@@ -1,7 +1,7 @@
 package aws
 
 import (
-	"aws-tools/aws/iam"
+	"awstool/aws/iam"
 
 	ec2Types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ebtTypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"

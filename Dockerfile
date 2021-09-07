@@ -3,11 +3,11 @@ RUN ["apk", "add", "build-base"]
 COPY . /app
 WORKDIR /app
 RUN ["go", "test", "./..."]
-WORKDIR /app/cmd/aws-tools
+WORKDIR /app/cmd/awstool
 RUN ["go", "build"]
-RUN ["./aws-tools", "help"]
+RUN ["./awstool", "help"]
 
 FROM alpine
-COPY --from=build /app/cmd/aws-tools/aws-tools /app/aws-tools
+COPY --from=build /app/cmd/awstool/awstool /app/awstool
 VOLUME /root/.aws
-ENTRYPOINT [ "/app/aws-tools" ]
+ENTRYPOINT [ "/app/awstool" ]

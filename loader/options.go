@@ -3,7 +3,7 @@ package loader
 import (
 	"strings"
 
-	"aws-tools/aws/ec2"
+	"awstool/aws/ec2"
 )
 
 type options struct {

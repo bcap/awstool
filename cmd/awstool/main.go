@@ -4,7 +4,7 @@ import (
 	"os"
 	"time"
 
-	"aws-tools/cmd"
+	"awstool/cmd"
 
 	log "github.com/sirupsen/logrus"
 )

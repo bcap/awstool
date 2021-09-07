@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	awst "aws-tools/aws"
+	awst "awstool/aws"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	log "github.com/sirupsen/logrus"
@@ -21,7 +21,7 @@ func RootCommand() *cobra.Command {
 	var verbosity int
 
 	cmd := cobra.Command{
-		Use:           "aws-tools",
+		Use:           "awstool",
 		Short:         "Set of tools to help on aws operations",
 		SilenceErrors: true,
 	}

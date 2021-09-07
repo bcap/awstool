@@ -7,9 +7,9 @@ import (
 	"strings"
 	"text/template"
 
-	awst "aws-tools/aws"
-	"aws-tools/aws/ec2"
-	"aws-tools/loader"
+	awst "awstool/aws"
+	"awstool/aws/ec2"
+	"awstool/loader"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2Types "github.com/aws/aws-sdk-go-v2/service/ec2/types"

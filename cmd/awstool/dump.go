@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"aws-tools/loader"
+	"awstool/loader"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	log "github.com/sirupsen/logrus"
