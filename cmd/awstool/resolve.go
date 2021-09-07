@@ -16,6 +16,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type printOptions struct {
+	publicIp  bool
+	privateIp bool
+	tags      []string
+	urlEncode bool
+	template  *template.Template
+}
+
 func ResolveCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:           "resolve",
@@ -25,11 +33,10 @@ func ResolveCommand() *cobra.Command {
 
 	var instanceId string
 	var tags []string
-	var printTags []string
-	var publicIp bool
-	var privateIp bool
-	var templ string
+
+	printOptions := printOptions{}
 	var noURLEncode bool
+	var templ string
 
 	cmd.Flags().StringVarP(
 		&instanceId, "instance-id", "i", "",
@@ -43,17 +50,17 @@ func ResolveCommand() *cobra.Command {
 	)
 
 	cmd.Flags().StringSliceVarP(
-		&printTags, "print-tags", "T", []string{},
+		&printOptions.tags, "print-tags", "T", []string{},
 		"By default the command only prints the Name tag. Pass a list of tags keys that should be printed instead",
 	)
 
 	cmd.Flags().BoolVarP(
-		&publicIp, "public", "u", false,
+		&printOptions.publicIp, "public", "u", false,
 		"Only print the public ip of the instance, if it has one",
 	)
 
 	cmd.Flags().BoolVarP(
-		&privateIp, "private", "r", false,
+		&printOptions.privateIp, "private", "r", false,
 		"Only print the private ip of the instance, if it has one",
 	)
 
@@ -79,14 +86,15 @@ func ResolveCommand() *cobra.Command {
 			return err
 		}
 
-		if publicIp && privateIp {
+		if printOptions.publicIp && printOptions.privateIp {
 			return fmt.Errorf("cannot have both private and public ip print options enabled")
 		}
 
-		var templEngine *template.Template
+		printOptions.urlEncode = !noURLEncode
+
 		if templ != "" {
 			var err error
-			templEngine, err = template.New("").Parse(templ)
+			printOptions.template, err = template.New("user_input").Parse(templ)
 			if err != nil {
 				return fmt.Errorf("invalid template %q: %w", templ, err)
 			}
@@ -102,7 +110,7 @@ func ResolveCommand() *cobra.Command {
 		if err != nil {
 			return fmt.Errorf("failed while fetching instances: %w", err)
 		}
-		printInstances(resolution, printTags, publicIp, privateIp, !noURLEncode, templEngine)
+		printInstances(resolution, printOptions)
 		return nil
 	}
 
@@ -128,51 +136,60 @@ func resolve(ctx context.Context, cfg aws.Config, instanceId string, tags map[st
 	return result, nil
 }
 
-type templateHelper struct {
+func printInstances(aws *awst.AWS, printOptions printOptions) {
+	for _, region := range aws.Regions {
+		for _, reservation := range region.EC2.Reservations {
+			for _, instance := range reservation.Instances {
+				printInstance(region.Region, reservation, instance, printOptions)
+			}
+		}
+	}
+}
+
+type templateData struct {
 	Region      string
 	Reservation *ec2Types.Reservation
 	Instance    *ec2Types.Instance
 }
 
-func printInstances(aws *awst.AWS, tags []string, publicIpOnly bool, privateIpOnly bool, urlEncode bool, template *template.Template) {
-	for _, region := range aws.Regions {
-		for _, reservation := range region.EC2.Reservations {
-			for _, instance := range reservation.Instances {
-				if template != nil {
-					buf := strings.Builder{}
-					helper := templateHelper{Region: region.Region, Reservation: &reservation, Instance: &instance}
-					if err := template.Execute(&buf, helper); err != nil {
-						fmt.Printf("template execution error: %v\n", err)
-					}
-					fmt.Println(buf.String())
-					continue
-				}
-
-				if privateIpOnly {
-					if instance.PrivateIpAddress != nil {
-						fmt.Println(safeString(instance.PrivateIpAddress))
-					}
-					continue
-				}
-
-				if publicIpOnly {
-					if instance.PublicIpAddress != nil {
-						fmt.Println(safeString(instance.PublicIpAddress))
-					}
-					continue
-				}
-
-				fmt.Printf(
-					"%s %s %s %s %s\n",
-					region.Region,
-					safeString(instance.InstanceId),
-					safeString(instance.PrivateIpAddress),
-					safeString(instance.PublicIpAddress),
-					tagsString(&instance, tags, urlEncode),
-				)
-			}
+func printInstance(region string, reservation ec2Types.Reservation, instance ec2Types.Instance, printOptions printOptions) {
+	if printOptions.template != nil {
+		buf := strings.Builder{}
+		data := templateData{
+			Region:      region,
+			Reservation: &reservation,
+			Instance:    &instance,
 		}
+		if err := printOptions.template.Execute(&buf, data); err != nil {
+			fmt.Printf("template execution error: %v\n", err)
+		}
+
+		fmt.Println(buf.String())
+		return
 	}
+
+	if printOptions.privateIp {
+		if instance.PrivateIpAddress != nil {
+			fmt.Println(safeString(instance.PrivateIpAddress))
+		}
+		return
+	}
+
+	if printOptions.publicIp {
+		if instance.PublicIpAddress != nil {
+			fmt.Println(safeString(instance.PublicIpAddress))
+		}
+		return
+	}
+
+	fmt.Printf(
+		"%s %s %s %s %s\n",
+		region,
+		safeString(instance.InstanceId),
+		safeString(instance.PrivateIpAddress),
+		safeString(instance.PublicIpAddress),
+		tagsString(&instance, printOptions.tags, printOptions.urlEncode),
+	)
 }
 
 func safeString(s *string) string {
