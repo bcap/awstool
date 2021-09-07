@@ -21,7 +21,7 @@ git push
 
 log "building and creating github release"
 (cd cmd/awstool && go build -v -o $TMPDIR/awstool)
-gh release create $(date +%Y%m%d%H%M) $TMPDIR/awstool < /dev/null
+gh release create $(date +%Y%m%d-%H%M) $TMPDIR/awstool < /dev/null
 
 log "building and pushing docker image"
 IMG=bcap/awstool:latest
