@@ -5,7 +5,7 @@ set -e -o pipefail
 cd $(dirname $0)
 
 TMPDIR=$(mktemp -d)
-echo $TMPDIR
+mkdir $TMPDIR/bin
 trap "rm -rf $TMPDIR" exit
 
 function log() {
@@ -24,17 +24,17 @@ go test ./...
 (
 cd cmd/awstool
 cat <<END > $TMPDIR/platforms
-darwin amd64
-darwin arm64
-linux amd64
-linux arm64
-windows amd64
+darwin  amd64 awstool-macos-amd64
+darwin  arm64 awstool-macos-arm64
+linux   amd64 awstool-linux-amd64
+linux   arm64 awstool-linux-arm64
+windows amd64 awstool-windows-amd64.exe
 END
-cat $TMPDIR/platforms | while read GOOS GOARCH; do
+cat $TMPDIR/platforms | while read GOOS GOARCH OUT; do
     NAME=awstool-$GOOS-$GOARCH
     log "building binary for $GOOS $GOARCH"
     export GOOS GOARCH
-    go build -o $TMPDIR/awstool-$GOOS-$GOARCH
+    go build -o $TMPDIR/bin/$OUT
 done
 )
 
@@ -46,7 +46,7 @@ log "pushing changes to github"
 git push 
 
 log "creating github release"
-gh release create $(date +%Y%m%d-%H%M) $TMPDIR/awstool-* < /dev/null
+gh release create $(date +%Y%m%d-%H%M) $TMPDIR/bin/* < /dev/null
 
 log "pulling new tag"
 git pull
