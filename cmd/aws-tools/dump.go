@@ -22,7 +22,7 @@ func DumpCommand() *cobra.Command {
 
 	cmd := cobra.Command{
 		Use:           "dump",
-		Short:         "Generates a single json dumping the results of many different description APIs from AWS",
+		Short:         "generates a single json dumping the results of many different description APIs from AWS",
 		SilenceErrors: true,
 	}
 
