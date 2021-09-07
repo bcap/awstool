@@ -4,6 +4,9 @@ set -e -o pipefail
 
 cd $(dirname $0)
 
+TMPDIR=$(mktemp -d)
+trap "rm -rf $TMPDIR" exit
+
 function log() {
     echo "=> $@" >&2
 }
@@ -16,6 +19,11 @@ fi
 log "pushing changes to github"
 git push 
 
+log "building and creating github release"
+(cd cmd/awstool && go build -v -o $TMPDIR/awstool)
+gh release create $(date +%Y%m%d%H%M) $TMPDIR/awstool < /dev/null
+
 log "building and pushing docker image"
 IMG=bcap/awstool:latest
 docker build -t $IMG . && docker push $IMG
+
