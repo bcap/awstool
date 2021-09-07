@@ -61,7 +61,7 @@ or
 
 Or you can also build and run with docker directly: 
 
-    docker build -t aws-tools
+    docker build -t aws-tools .
     docker run -v ~/.aws:/root/.aws -a stdout -a stderr aws-tools help
 
 
