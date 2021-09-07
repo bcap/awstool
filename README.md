@@ -45,6 +45,8 @@ Simplest way to run the tool is by using docker. You dont need to clone this rep
 
     docker run --rm -v ~/.aws:/root/.aws -a stdout -a stderr bcap/awstool help
 
+You can also download pre-built binaries from the [releases page](https://github.com/bcap/awstool/releases/)
+
 ## Building & Running
 
 After cloning the repo you can use the `awstool.sh` script, which wraps building a docker image and running it:
