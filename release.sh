@@ -17,6 +17,8 @@ if [[ $(git status -s | wc -l) -gt 0 ]]; then
     exit 1
 fi
 
+log "running tests locally"
+go test ./...
 
 # based on https://www.digitalocean.com/community/tutorials/how-to-build-go-executables-for-multiple-platforms-on-ubuntu-16-04
 (
@@ -45,3 +47,6 @@ git push
 
 log "creating github release"
 gh release create $(date +%Y%m%d-%H%M) $TMPDIR/awstool-* < /dev/null
+
+log "pulling new tag"
+git pull
