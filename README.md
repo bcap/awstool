@@ -47,23 +47,17 @@ Simplest way to run the tool is by using docker. You dont need to clone this rep
 
 You can also download pre-built binaries from the [releases page](https://github.com/bcap/awstool/releases/)
 
-## Building & Running
+## Building / Running / Installing
 
-After cloning the repo you can use the `awstool.sh` script, which wraps building a docker image and running it:
+You can install in your system with the `install.sh` script, which will build the tool and copy it to `GOPATH/bin/awstool` (you can run `go env GOPATH` to figure out your GOPATH)
+
+    ./install.sh
+    awstool help
+
+Alternatively you can use the `awstool.sh` script, which wraps building a docker image and running it:
 
     ./awstool.sh help
 
-Instead you can also build and/or run directly with local go: 
-
-    (cd cmd/awstool && go build && ./awstool help)
-
-or
+You can instead build and/or run directly with go with no system installation or docker images. This works best for a development workflow:
 
     go run cmd/awstool/*.go help
-
-Or you can also build and run with docker directly: 
-
-    docker build -t awstool .
-    docker run -v ~/.aws:/root/.aws -a stdout -a stderr awstool help
-
-
