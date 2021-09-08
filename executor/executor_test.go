@@ -16,7 +16,9 @@ func TestBasic(t *testing.T) {
 	e := NewExecutor(1)
 	c := make(chan struct{})
 
-	timeoutCtx, _ := context.WithTimeout(ctx, time.Second)
+	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
 	err := e.Wait(timeoutCtx)
 	if err != nil {
 		t.Fatal("executor Wait call should return instantly when no jobs were launched")
@@ -38,7 +40,8 @@ func TestBasic(t *testing.T) {
 		t.Fatal("simple execution should have finished instantly when waiting on job returned channel")
 	}
 
-	timeoutCtx, _ = context.WithTimeout(ctx, time.Second)
+	timeoutCtx, cancel = context.WithTimeout(ctx, time.Second)
+	defer cancel()
 	err = e.Wait(timeoutCtx)
 	if err != nil {
 		t.Fatal("simple execution should have finished instantly when waiting on executor Wait call")
