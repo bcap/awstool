@@ -1,4 +1,4 @@
-package main
+package dump
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func DumpCommand() *cobra.Command {
+func Command(awsCfg **aws.Config) *cobra.Command {
 	var regions []string
 	var excludeRegions []string
 	var services []string
@@ -69,7 +69,7 @@ func DumpCommand() *cobra.Command {
 		// see more at https://github.com/spf13/cobra/issues/340
 		cmd.SilenceUsage = true
 
-		return dump(cmd.Context(), awsCfg, loaderOptions...)
+		return dump(cmd.Context(), **awsCfg, loaderOptions...)
 	}
 
 	return &cmd

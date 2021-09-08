@@ -5,15 +5,13 @@ import (
 	"os"
 
 	awst "awstool/aws"
+	"awstool/cmd/awstool/dump"
+	"awstool/cmd/awstool/resolve"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
-
-// global var, not nice, but simplifies a lot not needing to pass data from parent
-// to sub command
-var awsCfg aws.Config
 
 func RootCommand() *cobra.Command {
 	cfgOptions := awst.NewAWSConfigOptions()
@@ -61,6 +59,8 @@ func RootCommand() *cobra.Command {
 		"Runs quiet, excluding even error messages. This overrides --verbosity",
 	)
 
+	var awsCfgP *aws.Config
+
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		if err := cfgOptions.Validate(); err != nil {
 			return err
@@ -75,17 +75,16 @@ func RootCommand() *cobra.Command {
 
 		log.Debugf("Starting run with the following args: %v", os.Args)
 
-		var err error
-		awsCfg, err = awst.NewAWSConfig(cmd.Context(), cfgOptions)
+		awsCfg, err := awst.NewAWSConfig(cmd.Context(), cfgOptions)
+		awsCfgP = &awsCfg
 		if err != nil {
 			return err
 		}
-
 		return nil
 	}
 
-	addSubCommand(&cmd, DumpCommand())
-	addSubCommand(&cmd, ResolveCommand())
+	addSubCommand(&cmd, dump.Command(&awsCfgP))
+	addSubCommand(&cmd, resolve.Command(&awsCfgP))
 
 	return &cmd
 }

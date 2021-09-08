@@ -1,4 +1,4 @@
-package main
+package resolve
 
 import (
 	"context"
@@ -25,7 +25,7 @@ type printOptions struct {
 	template  *template.Template
 }
 
-func ResolveCommand() *cobra.Command {
+func Command(awsCfg **aws.Config) *cobra.Command {
 	cmd := cobra.Command{
 		Use:           "resolve",
 		Short:         "resolves ec2 instances by a given set of inputs",
@@ -112,7 +112,7 @@ func ResolveCommand() *cobra.Command {
 		// See more at https://github.com/spf13/cobra/issues/340
 		cmd.SilenceUsage = true
 
-		resolution, err := resolve(cmd.Context(), awsCfg, instanceId, parsedTags)
+		resolution, err := resolve(cmd.Context(), **awsCfg, instanceId, parsedTags)
 		if err != nil {
 			return fmt.Errorf("failed while fetching instances: %w", err)
 		}
