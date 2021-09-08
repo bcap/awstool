@@ -21,6 +21,7 @@ type printOptions struct {
 	privateIp bool
 	tags      []string
 	urlEncode bool
+	header    bool
 	template  *template.Template
 }
 
@@ -68,6 +69,11 @@ func ResolveCommand() *cobra.Command {
 		&noURLEncode, "no-url-encode", "E", false,
 		"By default when printing tags their values are URL encoded to avoid whitespacing issues. "+
 			"Use this flag to avoid such mechanism",
+	)
+
+	cmd.Flags().BoolVarP(
+		&printOptions.header, "header", "d", false,
+		"Also print a header on the first line, which will name the columns being printed",
 	)
 
 	cmd.Flags().StringVar(
@@ -137,11 +143,30 @@ func resolve(ctx context.Context, cfg aws.Config, instanceId string, tags map[st
 }
 
 func printInstances(aws *awst.AWS, printOptions printOptions) {
+	printHeader(printOptions)
 	for _, region := range aws.Regions {
 		for _, reservation := range region.EC2.Reservations {
 			for _, instance := range reservation.Instances {
 				printInstance(region.Region, reservation, instance, printOptions)
 			}
+		}
+	}
+}
+
+func printHeader(printOptions printOptions) {
+	if !printOptions.header || printOptions.template != nil {
+		return
+	}
+	if printOptions.privateIp {
+		fmt.Println("#privateIp")
+	} else if printOptions.publicIp {
+		fmt.Println("#privateIp")
+	} else {
+		fmt.Print("#region #instanceid #privateIp #publicIp ")
+		if len(printOptions.tags) == 0 {
+			fmt.Println("#name")
+		} else {
+			fmt.Println("#tags")
 		}
 	}
 }
@@ -163,7 +188,6 @@ func printInstance(region string, reservation ec2Types.Reservation, instance ec2
 		if err := printOptions.template.Execute(&buf, data); err != nil {
 			fmt.Printf("template execution error: %v\n", err)
 		}
-
 		fmt.Println(buf.String())
 		return
 	}
@@ -225,7 +249,7 @@ func parseTags(tags []string) (map[string]string, error) {
 
 func tagsString(instance *ec2Types.Instance, tags []string, urlEncode bool) string {
 	// if no tags were passed, just return the name
-	if tags == nil || len(tags) == 0 {
+	if len(tags) == 0 {
 		name := ""
 		for _, tag := range instance.Tags {
 			if *tag.Key == "Name" {
