@@ -1,4 +1,4 @@
-// +build !windows
+// +build darwin linux !windows
 
 package cmd
 
