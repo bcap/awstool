@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"awstool/aws/ec2"
+	"awstool/aws/elasticsearch"
 )
 
 type options struct {
@@ -14,6 +15,7 @@ type options struct {
 	excludeServices map[string]struct{}
 
 	ec2FetchOptions []ec2.FetchOption
+	esFetchOptions  []elasticsearch.FetchOption
 }
 
 type Option func(opts *options)
@@ -50,9 +52,15 @@ func WithoutServices(services ...string) Option {
 	}
 }
 
-func WithEC2FetchOptions(ec2FetchOptions ...ec2.FetchOption) Option {
+func WithEC2FetchOptions(fetchOptions ...ec2.FetchOption) Option {
 	return func(opts *options) {
-		opts.ec2FetchOptions = append(opts.ec2FetchOptions, ec2FetchOptions...)
+		opts.ec2FetchOptions = append(opts.ec2FetchOptions, fetchOptions...)
+	}
+}
+
+func WithESFetchOptions(fetchOptions ...elasticsearch.FetchOption) Option {
+	return func(opts *options) {
+		opts.esFetchOptions = append(opts.esFetchOptions, fetchOptions...)
 	}
 }
 

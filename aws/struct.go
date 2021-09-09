@@ -129,6 +129,7 @@ func NewElasticBeanstalk() ElasticBeanstalk {
 type ElasticsearchDomain struct {
 	Status *esTypes.ElasticsearchDomainStatus
 	Config *esTypes.ElasticsearchDomainConfig
+	Tags   []esTypes.Tag
 }
 
 type Elasticsearch struct {

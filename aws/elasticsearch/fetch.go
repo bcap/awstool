@@ -9,10 +9,36 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type fetchOptions struct {
+	domains map[string]struct{}
+}
+
+func newFetchOptions(opts ...FetchOption) fetchOptions {
+	options := fetchOptions{
+		domains: map[string]struct{}{},
+	}
+	for _, fn := range opts {
+		fn(&options)
+	}
+	return options
+}
+
+type FetchOption func(opt *fetchOptions)
+
+func WithDomains(domains ...string) FetchOption {
+	return func(opt *fetchOptions) {
+		for _, domain := range domains {
+			opt.domains[domain] = struct{}{}
+		}
+	}
+}
+
 func ListAllDomainNames(
 	ctx context.Context,
 	cfg aws.Config,
+	fetchoptions ...FetchOption,
 ) ([]string, error) {
+	opts := newFetchOptions(fetchoptions...)
 	log.Debugf("Listing all %s Elasticsearch domain names", cfg.Region)
 
 	client := elasticsearchservice.NewFromConfig(cfg)
@@ -22,14 +48,27 @@ func ListAllDomainNames(
 	if err != nil {
 		return nil, err
 	}
-	log.Infof(
-		"Listed %d %s Elasticsearch domain names",
-		len(describeResult.DomainNames), cfg.Region,
-	)
 	result := make([]string, len(describeResult.DomainNames))
 	for idx, domainName := range describeResult.DomainNames {
 		result[idx] = *domainName.DomainName
 	}
+
+	// filter out domains if specified
+	if len(opts.domains) > 0 {
+		filteredResult := []string{}
+		for _, domain := range result {
+			if _, ok := opts.domains[domain]; ok {
+				filteredResult = append(filteredResult, domain)
+			}
+		}
+		result = filteredResult
+	}
+
+	log.Infof(
+		"Listed %d %s Elasticsearch domain names",
+		len(result), cfg.Region,
+	)
+
 	return result, nil
 }
 
@@ -58,7 +97,7 @@ func FetchDomainConfig(
 	cfg aws.Config,
 	domain string,
 ) (*esTypes.ElasticsearchDomainConfig, error) {
-	log.Debugf("Fetching %s Elasticsearch domain config for domain %s", cfg.Region, domain)
+	log.Debugf("Fetching %s Elasticsearch domain config for %s", cfg.Region, domain)
 
 	client := elasticsearchservice.NewFromConfig(cfg)
 	describeResult, err := client.DescribeElasticsearchDomainConfig(
@@ -69,6 +108,26 @@ func FetchDomainConfig(
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("Fetched %s Elasticsearch domain config for domain %s", cfg.Region, domain)
+	log.Debugf("Fetched %s Elasticsearch domain config for %s", cfg.Region, domain)
 	return describeResult.DomainConfig, nil
+}
+
+func FetchDomainTags(
+	ctx context.Context,
+	cfg aws.Config,
+	domainARN string,
+) ([]esTypes.Tag, error) {
+	log.Debugf("Fetching %s Elasticsearch domain tags for %s", cfg.Region, domainARN)
+
+	client := elasticsearchservice.NewFromConfig(cfg)
+	result, err := client.ListTags(
+		ctx, &elasticsearchservice.ListTagsInput{
+			ARN: &domainARN,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	log.Debugf("Fetched %s Elasticsearch domain tags for %s", cfg.Region, domainARN)
+	return result.TagList, nil
 }

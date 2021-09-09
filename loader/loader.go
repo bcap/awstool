@@ -390,7 +390,7 @@ func fetchElasticBeanstalk(ctx context.Context, cfg aws.Config, executor *execut
 
 func fetchElasticsearch(ctx context.Context, cfg aws.Config, executor *executor.Executor, errorsCh chan<- error, result *awst.Region, options options) {
 	executor.Launch(ctx, func() {
-		domains, err := elasticsearch.ListAllDomainNames(ctx, cfg)
+		domains, err := elasticsearch.ListAllDomainNames(ctx, cfg, options.esFetchOptions...)
 		if err != nil {
 			errorsCh <- fmt.Errorf("error while listing all Elasticsearch domain names: %w", err)
 			return
@@ -419,6 +419,13 @@ func fetchElasticsearch(ctx context.Context, cfg aws.Config, executor *executor.
 					return
 				}
 				domainResult(domain).Status = status
+
+				tags, err := elasticsearch.FetchDomainTags(ctx, cfg, *status.ARN)
+				if err != nil {
+					errorsCh <- fmt.Errorf("error while fetching tags for Elasticsearch domain %s: %w", domain, err)
+					return
+				}
+				domainResult(domain).Tags = tags
 			})
 
 			executor.Launch(ctx, func() {

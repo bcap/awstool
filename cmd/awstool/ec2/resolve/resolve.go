@@ -72,7 +72,7 @@ func Command(awsCfg **aws.Config) *cobra.Command {
 	)
 
 	cmd.Flags().BoolVarP(
-		&printOptions.header, "header", "d", false,
+		&printOptions.header, "header", "H", false,
 		"Also print a header on the first line, which will name the columns being printed",
 	)
 
