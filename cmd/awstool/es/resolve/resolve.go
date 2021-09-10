@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -116,12 +117,37 @@ func resolve(ctx context.Context, cfg aws.Config, domain string) (*awst.AWS, err
 	return result, nil
 }
 
+type printDomainInput struct {
+	region string
+	domain *awst.ElasticsearchDomain
+}
+
 func printDomains(aws *awst.AWS, printOptions printOptions) {
 	printHeader(printOptions)
+
+	inputs := []printDomainInput{}
 	for _, region := range aws.Regions {
 		for _, domain := range region.Elasticsearch.Domains {
-			printDomain(region.Region, domain, printOptions)
+			inputs = append(inputs, printDomainInput{
+				region: region.Region,
+				domain: domain,
+			})
 		}
+	}
+
+	sort.SliceStable(inputs, func(i, j int) bool {
+		comparison := strings.Compare(inputs[i].region, inputs[j].region)
+		if comparison == 0 {
+			comparison = strings.Compare(
+				*inputs[i].domain.Status.DomainName,
+				*inputs[j].domain.Status.DomainName,
+			)
+		}
+		return comparison < 0
+	})
+
+	for _, input := range inputs {
+		printDomain(input.region, input.domain, printOptions)
 	}
 }
 
@@ -129,12 +155,11 @@ func printHeader(printOptions printOptions) {
 	if !printOptions.header || printOptions.template != nil {
 		return
 	}
-	fmt.Print("#region #domain #arn #endpoints")
+	fmt.Print("#region #domain #endpoints")
 	if printOptions.allTags || len(printOptions.tags) > 0 {
-		fmt.Println(" #tags")
-	} else {
-		fmt.Println()
+		fmt.Print(" #tags")
 	}
+	fmt.Println(" #instance_count #instance_type")
 }
 
 type templateData struct {
@@ -157,18 +182,20 @@ func printDomain(region string, domain *awst.ElasticsearchDomain, printOptions p
 	}
 
 	fmt.Printf(
-		"%s %s %s %s",
+		"%s %s %s",
 		region,
 		*domain.Status.DomainName,
-		*domain.Status.ARN,
 		strings.Join(endpoints(domain.Status), ","),
 	)
 	tagsStr := tagsString(domain, printOptions)
 	if tagsStr != "" {
-		fmt.Printf(" %s\n", tagsStr)
-	} else {
-		fmt.Println()
+		fmt.Printf(" %s", tagsStr)
 	}
+	fmt.Printf(
+		" %d %s\n",
+		*domain.Status.ElasticsearchClusterConfig.InstanceCount,
+		domain.Status.ElasticsearchClusterConfig.InstanceType,
+	)
 }
 
 func endpoints(domain *esTypes.ElasticsearchDomainStatus) []string {
