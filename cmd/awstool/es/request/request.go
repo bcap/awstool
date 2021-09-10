@@ -30,7 +30,7 @@ func Command(awsCfg **aws.Config) *cobra.Command {
 	expectedPositionals := "REGION DOMAIN METHOD PATH [DATA]"
 
 	cmd := cobra.Command{
-		Use:   "request",
+		Use:   "request " + expectedPositionals,
 		Short: "submits a request to given elasticsearch domain",
 		Long: "Submits a request to an elasticsearch domain by the given inputs. " +
 			"Arguments must go in following order: " + expectedPositionals,
