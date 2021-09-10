@@ -53,7 +53,7 @@ func Command(awsCfg **aws.Config) *cobra.Command {
 
 		region, instance, err := resolve(cmd.Context(), **awsCfg, identifier.instance)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not resolve instance with id %s: %w", identifier.instance, err)
 		}
 
 		if identifier.user == "" {
