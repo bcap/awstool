@@ -124,6 +124,28 @@ func FetchAllEBSVolumes(
 	return volumes, nil
 }
 
+func GetImage(ctx context.Context, cfg aws.Config, imageId string) (*ec2Types.Image, error) {
+	log.Debugf("Fetching %s ec2 image %s", cfg.Region, imageId)
+
+	client := ec2.NewFromConfig(cfg)
+
+	includeDeprecated := true
+	result, err := client.DescribeImages(ctx, &ec2.DescribeImagesInput{
+		ImageIds:          []string{imageId},
+		IncludeDeprecated: &includeDeprecated,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result.Images) == 0 {
+		return nil, nil
+	}
+
+	return &result.Images[0], nil
+}
+
 func isInstanceNotFoundError(err error) bool {
 	return strings.Contains(err.Error(), "error InvalidInstanceID.NotFound")
 }
