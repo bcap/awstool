@@ -93,7 +93,7 @@ func RootCommand() *cobra.Command {
 }
 
 func setupLogging(verbosity int) {
-	log.SetLevel(log.ErrorLevel)
+	log.SetLevel(log.WarnLevel)
 	if verbosity == 1 {
 		log.SetLevel(log.InfoLevel)
 	} else if verbosity == 2 {
