@@ -1,6 +1,6 @@
 # awstool
 
-This is a helper tool to help out with common commands regarding AWS resources/APIS
+This is a tool I have been writing to help me out with common commands regarding AWS resources/APIS
 
 Currently implemented commands are:
 - `dump`: generates a single json dumping the results of many different description APIs from AWS
