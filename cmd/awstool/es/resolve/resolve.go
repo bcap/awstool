@@ -155,11 +155,11 @@ func printHeader(printOptions printOptions) {
 	if !printOptions.header || printOptions.template != nil {
 		return
 	}
-	fmt.Print("#region #domain #endpoints")
+	fmt.Print("#region #domain #endpoints #instance_count #instance_type")
 	if printOptions.allTags || len(printOptions.tags) > 0 {
 		fmt.Print(" #tags")
 	}
-	fmt.Println(" #instance_count #instance_type")
+	fmt.Println()
 }
 
 type templateData struct {
@@ -182,20 +182,18 @@ func printDomain(region string, domain *awst.ElasticsearchDomain, printOptions p
 	}
 
 	fmt.Printf(
-		"%s %s %s",
+		"%s %s %s %d %s",
 		region,
 		*domain.Status.DomainName,
 		strings.Join(endpoints(domain.Status), ","),
+		*domain.Status.ElasticsearchClusterConfig.InstanceCount,
+		domain.Status.ElasticsearchClusterConfig.InstanceType,
 	)
 	tagsStr := tagsString(domain, printOptions)
 	if tagsStr != "" {
 		fmt.Printf(" %s", tagsStr)
 	}
-	fmt.Printf(
-		" %d %s\n",
-		*domain.Status.ElasticsearchClusterConfig.InstanceCount,
-		domain.Status.ElasticsearchClusterConfig.InstanceType,
-	)
+	fmt.Println()
 }
 
 func endpoints(domain *esTypes.ElasticsearchDomainStatus) []string {
