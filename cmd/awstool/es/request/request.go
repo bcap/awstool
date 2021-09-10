@@ -3,6 +3,7 @@ package request
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -20,6 +21,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
+
+type printOptions struct {
+	pretty bool
+}
 
 func Command(awsCfg **aws.Config) *cobra.Command {
 	expectedPositionals := "REGION DOMAIN METHOD PATH [DATA]"
@@ -43,12 +48,25 @@ func Command(awsCfg **aws.Config) *cobra.Command {
 		return nil
 	}
 
+	printOptions := printOptions{}
 	var headers []string
+	var jsonBody bool
+
+	cmd.Flags().BoolVarP(
+		&printOptions.pretty, "pretty", "P", false,
+		"Tries to pretty print the resulting body. Currently only works for json content types",
+	)
 
 	cmd.Flags().StringSliceVarP(
 		&headers, "headers", "H", []string{},
 		"Headers to be passed in the request. Format is key:value for each header. "+
 			"Can be specified multiple times or a single time with comma separated values",
+	)
+
+	cmd.Flags().BoolVarP(
+		&jsonBody, "json-body", "J", false,
+		"Sets the content type of the passed body as a json. "+
+			"This is the same as passing -H \"Content-Type: application/json\"",
 	)
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
@@ -70,6 +88,9 @@ func Command(awsCfg **aws.Config) *cobra.Command {
 		if err != nil {
 			return err
 		}
+		if jsonBody {
+			headerMap["Content-Type"] = "application/json"
+		}
 
 		// We silence usage here instead of setting in the command struct declaration because it is
 		// only at this point forward that we want to not display the usage when an error occurs,
@@ -82,7 +103,7 @@ func Command(awsCfg **aws.Config) *cobra.Command {
 			return err
 		}
 
-		_, err = request(cmd.Context(), domain, method, path, headerMap, data)
+		_, err = request(cmd.Context(), domain, method, path, headerMap, data, printOptions)
 		return err
 	}
 
@@ -118,7 +139,15 @@ func resolve(ctx context.Context, cfg aws.Config, region string, domain string) 
 	return domains[0], nil
 }
 
-func request(ctx context.Context, domain *awst.ElasticsearchDomain, method string, path string, headers map[string]string, data []byte) (*http.Response, error) {
+func request(
+	ctx context.Context,
+	domain *awst.ElasticsearchDomain,
+	method string,
+	path string,
+	headers map[string]string,
+	data []byte,
+	printOptions printOptions,
+) (*http.Response, error) {
 	client := http.DefaultClient
 	endpoint := domain.Status.Endpoint
 	if endpoint == nil {
@@ -151,17 +180,17 @@ func request(ctx context.Context, domain *awst.ElasticsearchDomain, method strin
 		req.Header.Add(key, value)
 	}
 
-	printRequest(req)
+	printRequest(req, data, printOptions)
 
 	start := time.Now()
 	resp, err := client.Do(req)
 
-	printResponse(resp, start)
+	printResponse(resp, start, printOptions)
 
 	return resp, err
 }
 
-func printRequest(req *http.Request) {
+func printRequest(req *http.Request, body []byte, printOptions printOptions) {
 	if !log.IsLevelEnabled(log.InfoLevel) {
 		return
 	}
@@ -173,9 +202,10 @@ func printRequest(req *http.Request) {
 		}
 	}
 	fmt.Fprint(os.Stderr, ">\n")
+	fmt.Fprintf(os.Stderr, "* sending %d bytes body\n", len(body))
 }
 
-func printResponse(resp *http.Response, reqTime time.Time) error {
+func printResponse(resp *http.Response, reqTime time.Time, printOptions printOptions) error {
 	if log.IsLevelEnabled(log.InfoLevel) {
 		fmt.Fprintf(os.Stderr, "< %s\n", resp.Status)
 		for key, values := range resp.Header {
@@ -192,7 +222,18 @@ func printResponse(resp *http.Response, reqTime time.Time) error {
 	}
 
 	if log.IsLevelEnabled(log.InfoLevel) {
+		fmt.Fprintf(os.Stderr, "* received %d bytes body\n", len(body))
 		fmt.Fprintf(os.Stderr, "* response received in %v\n", time.Since(reqTime))
+	}
+
+	if printOptions.pretty {
+		// tries to parse and reprint an indented json. If not possible, move on
+		var data interface{}
+		if err := json.Unmarshal(body, &data); err == nil {
+			if prettyPrinted, err := json.MarshalIndent(data, "", "  "); err == nil {
+				body = prettyPrinted
+			}
+		}
 	}
 
 	fmt.Print(string(body))

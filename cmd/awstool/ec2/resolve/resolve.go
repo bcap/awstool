@@ -20,6 +20,7 @@ type printOptions struct {
 	publicIp  bool
 	privateIp bool
 	tags      []string
+	allTags   bool
 	urlEncode bool
 	header    bool
 	template  *template.Template
@@ -52,7 +53,13 @@ func Command(awsCfg **aws.Config) *cobra.Command {
 
 	cmd.Flags().StringSliceVarP(
 		&printOptions.tags, "print-tags", "T", []string{},
-		"By default the command only prints the Name tag. Pass a list of tags keys that should be printed instead",
+		"By default the command only prints the Name tag. Pass a list of tags keys that "+
+			"should be printed instead. See also --print-all-tags",
+	)
+
+	cmd.Flags().BoolVarP(
+		&printOptions.allTags, "print-all-tags", "A", false,
+		"Also prints all tags associated to the instances. Overrides --print-tags",
 	)
 
 	cmd.Flags().BoolVarP(
@@ -163,10 +170,10 @@ func printHeader(printOptions printOptions) {
 		fmt.Println("#privateIp")
 	} else {
 		fmt.Print("#region #instanceid #privateIp #publicIp ")
-		if len(printOptions.tags) == 0 {
-			fmt.Println("#name")
-		} else {
+		if printOptions.allTags || len(printOptions.tags) > 0 {
 			fmt.Println("#tags")
+		} else {
+			fmt.Println("#name")
 		}
 	}
 }
@@ -212,7 +219,7 @@ func printInstance(region string, reservation ec2Types.Reservation, instance ec2
 		safeString(instance.InstanceId),
 		safeString(instance.PrivateIpAddress),
 		safeString(instance.PublicIpAddress),
-		tagsString(&instance, printOptions.tags, printOptions.urlEncode),
+		tagsString(&instance, printOptions),
 	)
 }
 
@@ -247,9 +254,9 @@ func parseTags(tags []string) (map[string]string, error) {
 	return parsedTags, nil
 }
 
-func tagsString(instance *ec2Types.Instance, tags []string, urlEncode bool) string {
-	// if no tags were passed, just return the name
-	if len(tags) == 0 {
+func tagsString(instance *ec2Types.Instance, printOptions printOptions) string {
+	// if no tags were passed and print-all-tags is not enabled, just return the name
+	if len(printOptions.tags) == 0 && !printOptions.allTags {
 		name := ""
 		for _, tag := range instance.Tags {
 			if *tag.Key == "Name" {
@@ -257,24 +264,37 @@ func tagsString(instance *ec2Types.Instance, tags []string, urlEncode bool) stri
 				break
 			}
 		}
-		if urlEncode {
+		if printOptions.urlEncode {
 			name = url.PathEscape(name)
 		}
 		return safeString(&name)
 	}
 
 	result := []string{}
-	// stupid O(n^2) algorithm, but dataset is small so we dont care much
-	for _, tagToFind := range tags {
+	appendTag := func(tag ec2Types.Tag) {
+		value := *tag.Value
+		if printOptions.urlEncode {
+			value = url.PathEscape(value)
+		}
+		result = append(result, *tag.Key+":"+value)
+	}
+
+	if printOptions.allTags {
 		for _, tag := range instance.Tags {
-			if *tag.Key == tagToFind {
-				value := *tag.Value
-				if urlEncode {
-					value = url.PathEscape(value)
-				}
-				result = append(result, *tag.Key+":"+value)
+			appendTag(tag)
+		}
+
+	} else {
+		tagMap := map[string]ec2Types.Tag{}
+		for _, tag := range instance.Tags {
+			tagMap[*tag.Key] = tag
+		}
+		for _, tagToFind := range printOptions.tags {
+			if tag, ok := tagMap[tagToFind]; ok {
+				appendTag(tag)
 			}
 		}
 	}
+
 	return strings.Join(result, ",")
 }

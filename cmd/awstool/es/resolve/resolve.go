@@ -3,6 +3,7 @@ package resolve
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"text/template"
 
@@ -16,8 +17,11 @@ import (
 )
 
 type printOptions struct {
-	header   bool
-	template *template.Template
+	header    bool
+	tags      []string
+	allTags   bool
+	urlEncode bool
+	template  *template.Template
 }
 
 func Command(awsCfg **aws.Config) *cobra.Command {
@@ -31,15 +35,32 @@ func Command(awsCfg **aws.Config) *cobra.Command {
 
 	printOptions := printOptions{}
 	var templ string
+	var noURLEncode bool
 
 	cmd.Flags().StringVarP(
 		&domain, "domain", "d", "",
 		"Find the domain by its name",
 	)
 
+	cmd.Flags().StringSliceVarP(
+		&printOptions.tags, "print-tags", "T", []string{},
+		"Pass a list of tags keys that should be printed. See also --print-all-tags",
+	)
+
+	cmd.Flags().BoolVarP(
+		&printOptions.allTags, "print-all-tags", "A", false,
+		"Also prints all tags associated to the domains. Overrides --print-tags",
+	)
+
 	cmd.Flags().BoolVarP(
 		&printOptions.header, "header", "H", false,
 		"Also print a header on the first line, which will name the columns being printed",
+	)
+
+	cmd.Flags().BoolVarP(
+		&noURLEncode, "no-url-encode", "E", false,
+		"By default when printing tags their values are URL encoded to avoid whitespacing issues. "+
+			"Use this flag to avoid such mechanism",
 	)
 
 	cmd.Flags().StringVar(
@@ -71,6 +92,7 @@ func Command(awsCfg **aws.Config) *cobra.Command {
 		if err != nil {
 			return fmt.Errorf("failed while fetching instances: %w", err)
 		}
+		printOptions.urlEncode = !noURLEncode
 		printDomains(resolution, printOptions)
 		return nil
 	}
@@ -107,25 +129,46 @@ func printHeader(printOptions printOptions) {
 	if !printOptions.header || printOptions.template != nil {
 		return
 	}
-	fmt.Println("#region #domain #arn #endpoints")
+	fmt.Print("#region #domain #arn #endpoints")
+	if printOptions.allTags || len(printOptions.tags) > 0 {
+		fmt.Println(" #tags")
+	} else {
+		fmt.Println()
+	}
+}
+
+type templateData struct {
+	Region string
+	Domain *awst.ElasticsearchDomain
 }
 
 func printDomain(region string, domain *awst.ElasticsearchDomain, printOptions printOptions) {
 	if printOptions.template != nil {
 		buf := strings.Builder{}
-		if err := printOptions.template.Execute(&buf, domain); err != nil {
+		data := templateData{
+			Region: region,
+			Domain: domain,
+		}
+		if err := printOptions.template.Execute(&buf, data); err != nil {
 			fmt.Printf("template execution error: %v\n", err)
 		}
 		fmt.Println(buf.String())
 		return
 	}
+
 	fmt.Printf(
-		"%s %s %s %s\n",
+		"%s %s %s %s",
 		region,
 		*domain.Status.DomainName,
 		*domain.Status.ARN,
 		strings.Join(endpoints(domain.Status), ","),
 	)
+	tagsStr := tagsString(domain, printOptions)
+	if tagsStr != "" {
+		fmt.Printf(" %s\n", tagsStr)
+	} else {
+		fmt.Println()
+	}
 }
 
 func endpoints(domain *esTypes.ElasticsearchDomainStatus) []string {
@@ -137,4 +180,38 @@ func endpoints(domain *esTypes.ElasticsearchDomainStatus) []string {
 		result = append(result, value)
 	}
 	return result
+}
+
+func tagsString(domain *awst.ElasticsearchDomain, printOptions printOptions) string {
+	if !printOptions.allTags && len(printOptions.tags) == 0 {
+		return ""
+	}
+
+	result := []string{}
+	appendTag := func(tag esTypes.Tag) {
+		value := *tag.Value
+		if printOptions.urlEncode {
+			value = url.PathEscape(value)
+		}
+		result = append(result, *tag.Key+":"+value)
+	}
+
+	if printOptions.allTags {
+		for _, tag := range domain.Tags {
+			appendTag(tag)
+		}
+
+	} else {
+		tagMap := map[string]esTypes.Tag{}
+		for _, tag := range domain.Tags {
+			tagMap[*tag.Key] = tag
+		}
+		for _, tagToFind := range printOptions.tags {
+			if tag, ok := tagMap[tagToFind]; ok {
+				appendTag(tag)
+			}
+		}
+	}
+
+	return strings.Join(result, ",")
 }
