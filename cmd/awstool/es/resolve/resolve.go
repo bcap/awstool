@@ -155,7 +155,7 @@ func printHeader(printOptions printOptions) {
 	if !printOptions.header || printOptions.template != nil {
 		return
 	}
-	fmt.Print("#region #domain #endpoints #instance_count #instance_type")
+	fmt.Print("#region #domain #version #endpoints #instance_count #instance_type")
 	if printOptions.allTags || len(printOptions.tags) > 0 {
 		fmt.Print(" #tags")
 	}
@@ -182,9 +182,10 @@ func printDomain(region string, domain *awst.ElasticsearchDomain, printOptions p
 	}
 
 	fmt.Printf(
-		"%s %s %s %d %s",
+		"%s %s %s %s %d %s",
 		region,
 		*domain.Status.DomainName,
+		*domain.Config.ElasticsearchVersion.Options,
 		strings.Join(endpoints(domain.Status), ","),
 		*domain.Status.ElasticsearchClusterConfig.InstanceCount,
 		domain.Status.ElasticsearchClusterConfig.InstanceType,
