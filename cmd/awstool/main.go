@@ -9,6 +9,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type exitCodeErr interface {
+	ExitCode() int
+}
+
 func main() {
 	ctx, cancel := cmd.CreateRunnableContext()
 	defer cancel()
@@ -17,7 +21,11 @@ func main() {
 
 	if err := RootCommand().ExecuteContext(ctx); err != nil {
 		log.Error(err)
-		os.Exit(1)
+		exitCode := 1
+		if errWithCode, ok := err.(exitCodeErr); ok {
+			exitCode = errWithCode.ExitCode()
+		}
+		os.Exit(exitCode)
 	}
 
 	log.Debug("Command finished successfully")

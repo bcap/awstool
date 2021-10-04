@@ -51,6 +51,7 @@ func Command(awsCfg **aws.Config) *cobra.Command {
 	printOptions := printOptions{}
 	var headers []string
 	var jsonBody bool
+	var noStatusCheck bool
 
 	cmd.Flags().BoolVarP(
 		&printOptions.pretty, "pretty", "P", false,
@@ -67,6 +68,14 @@ func Command(awsCfg **aws.Config) *cobra.Command {
 		&jsonBody, "json-body", "J", false,
 		"Sets the content type of the passed body as a json. "+
 			"This is the same as passing -H \"Content-Type: application/json\"",
+	)
+
+	cmd.Flags().BoolVarP(
+		&noStatusCheck, "no-status-check", "C", false,
+		"By default the returning status code of the request is checked and the execution fails "+
+			"if the status code is not of the 2XX class (returning 10 + code class, eg: 11 for 1XX "+
+			"codes, 13 for 3XX codes, 14 for 4XX codes and 15 for 5XX codes). This options disables "+
+			"this check",
 	)
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
@@ -103,11 +112,29 @@ func Command(awsCfg **aws.Config) *cobra.Command {
 			return err
 		}
 
-		_, err = request(cmd.Context(), domain, method, path, headerMap, data, printOptions)
-		return err
+		resp, err := request(cmd.Context(), domain, method, path, headerMap, data, printOptions)
+		if err != nil {
+			return err
+		}
+		if !noStatusCheck && resp.StatusCode/100 != 2 {
+			return &statusCodeErr{code: resp.StatusCode}
+		}
+		return nil
 	}
 
 	return &cmd
+}
+
+type statusCodeErr struct {
+	code int
+}
+
+func (e *statusCodeErr) ExitCode() int {
+	return e.code/100 + 10
+}
+
+func (e *statusCodeErr) Error() string {
+	return fmt.Sprintf("request returned status code %d", e.code)
 }
 
 func resolve(ctx context.Context, cfg aws.Config, region string, domain string) (*awst.ElasticsearchDomain, error) {
