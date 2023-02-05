@@ -1,23 +1,34 @@
-FROM golang:alpine as build
+# base image for everything else
+FROM alpine as base
+RUN apk add go bash
 
-RUN ["apk", "add", "build-base"]
-
+# image with app source ready to be built
+FROM base as pre-build
+RUN apk add build-base
 WORKDIR /app
-
-# To speed up build process we first download required modules
-# then later focus on building our source. That way changing a 
-# file in the project doesnt cause redownload of dependencies
+## cache deps
 COPY go.mod go.sum ./
 RUN go mod download -x
-
-COPY . .
+### check cachebuilddeps.go for more context
+COPY cachebuilddeps.go .
+RUN go build -v ./...
+RUN go vet -v ./...
 RUN go test -v ./...
-WORKDIR /app/cmd/awstool
-RUN go build -v -x
+## copy everything else
+COPY . .
+RUN rm cachebuilddeps.go
+
+# build
+FROM pre-build as build
+RUN go build -v ./...
+RUN go vet -v ./...
+RUN go test -v ./...
+RUN go build -o awstool cmd/awstool/*.go
+## check that the program can initialize
 RUN ./awstool help
 
 # finally the released image is minimal with only the compiled binary
-FROM alpine
-COPY --from=build /app/cmd/awstool/awstool /app/awstool
+FROM base
+COPY --from=build /app/awstool /app/awstool
 VOLUME /root/.aws
 ENTRYPOINT [ "/app/awstool" ]

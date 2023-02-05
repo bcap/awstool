@@ -1,6 +1,6 @@
 .*
 *.json
 Dockerfile
+Makefile
 README.md
-awstool.sh
-release.sh
+dist/
