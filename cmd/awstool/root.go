@@ -9,6 +9,7 @@ import (
 	"awstool/cmd/awstool/dump"
 	"awstool/cmd/awstool/ec2"
 	"awstool/cmd/awstool/es"
+	"awstool/cmd/awstool/s3"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	log "github.com/sirupsen/logrus"
@@ -88,6 +89,7 @@ func RootCommand() *cobra.Command {
 	awstcmd.AddSubCommand(&cmd, dump.Command(&awsCfgP))
 	awstcmd.AddSubCommand(&cmd, ec2.Command(&awsCfgP))
 	awstcmd.AddSubCommand(&cmd, es.Command(&awsCfgP))
+	awstcmd.AddSubCommand(&cmd, s3.Command(&awsCfgP))
 
 	return &cmd
 }
